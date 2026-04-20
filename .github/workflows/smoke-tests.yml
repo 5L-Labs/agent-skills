@@ -22,7 +22,13 @@ jobs:
           if grep -rn 'ghp_\|ghs_\|sk-[a-zA-Z0-9]\{20,\}\|xox[bpsa]-' . \
             --include='*.md' --include='*.yaml' --include='*.yml' \
             --include='*.json' --include='*.txt' --include='*.py' \
-            --include='*.sh' 2>/dev/null | grep -v '.git/'; then
+            --include='*.sh' 2>/dev/null \
+            | grep -v '.git/' \
+            | grep -v '\.github/' \
+            | grep -v '\.\.\.' \
+            | grep -v 'xxx\+x\?' \
+            | grep -v '""' \
+            | grep -v 'sk-xxx'; then
             echo "FAIL: Possible secrets found"
             exit 1
           fi

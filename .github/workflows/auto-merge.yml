@@ -20,10 +20,10 @@ jobs:
         run: |
           echo "Smoke tests passed (run #${{ github.event.workflow_run.id }})"
 
-          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          echo "Looking for PRs with head SHA: $HEAD_SHA"
+          HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Looking for PRs with head branch: $HEAD_BRANCH"
 
-          PR_NUMBER=$(gh pr list --head "$HEAD_SHA" --json number --jq '.[0].number // empty')
+          PR_NUMBER=$(gh pr list --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number // empty')
 
           if [ -z "$PR_NUMBER" ]; then
             echo "No open PR found for this commit"
