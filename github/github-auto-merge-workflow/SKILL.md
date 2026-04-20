@@ -70,11 +70,17 @@ jobs:
 3. Checks `conclusion == 'success'` — does nothing on failure
 4. Finds PR by head SHA, squash-merges, deletes branch
 
+## Pitfalls
+
+- **Do NOT add a `pull_request` trigger to the auto-merge workflow.** It causes a second run that tries `gh pr merge` outside the `workflow_run` context and fails with "Enable auto-merge for PR | failure". Only use `workflow_run`.
+- The `workflow_run` trigger fires on ALL runs of the CI workflow, including pushes to main. The `if: conclusion == 'success'` guard handles this — it skips non-PR runs because `gh pr list --head` finds nothing.
+
 ## Limitations
 
 - Only works for same-repo PRs (not forks)
 - No reviewer requirements (needs branch protection / Pro)
 - Multiple PRs with same head SHA: only first is merged
+- Public repos can just use branch protection instead (no Pro needed)
 
 ## Use Cases
 
