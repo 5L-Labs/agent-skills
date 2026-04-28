@@ -13,8 +13,10 @@ Extract transcripts from YouTube videos and convert them into useful formats.
 
 ## Setup
 
+Install the dependency in the Hermes venv (bare `pip install` and `uv pip install` without `--python` target the wrong environment):
+
 ```bash
-pip install youtube-transcript-api
+uv pip install --python /opt/hermes/.venv/bin/python youtube-transcript-api
 ```
 
 ## Helper Script
@@ -100,11 +102,14 @@ Example structure:
 
 ## Pitfalls
 
-- **System python3 missing youtube-transcript-api**: On this server, system `python3` has no pip and `uv pip install` doesn't install to it. The module is pre-installed in `/opt/hermes/.venv/bin/python`. Always run the script with that interpreter:
+- **System python3 missing youtube-transcript-api**: On this server, system `python3` has no pip installed. Always run the helper script with the Hermes venv interpreter:
   ```bash
   /opt/hermes/.venv/bin/python SKILL_DIR/scripts/fetch_transcript.py "URL" --text-only --timestamps
   ```
-  Do NOT use bare `python3` — it will fail with "youtube-transcript-api not installed."
+  Do NOT use bare `python3` — it will fail with "youtube-transcript-api not installed." If the module is also missing from the venv, install it first:
+  ```bash
+  uv pip install --python /opt/hermes/.venv/bin/python youtube-transcript-api
+  ```
 
 - **Cloud IP blocking**: YouTube blocks transcript requests from cloud provider IPs (AWS, GCP, Azure). The script returns a JSON error: `{"error": "Could not retrieve a transcript..."}`. Workarounds:
   - Use a residential proxy or VPN

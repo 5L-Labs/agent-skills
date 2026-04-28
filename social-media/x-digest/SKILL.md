@@ -117,9 +117,32 @@ The `ai-high-signal-digest` cron job runs daily at 09:00 UTC, delivering themati
 
 Format preference: plain conversational summaries grouped by theme, with raw tweet links at the end. No fancy markdown, no emoji section dividers.
 
+## Fallback: Bearer Token via xurl
+
+The `xapi.py` wrapper has NO auto-refresh logic. When the OAuth2 token expires AND the refresh token is exhausted (returns 400 "invalid_request"), xapi.py fails completely. For read-only endpoints (list-tweets, search, user lookup), fall back to xurl with bearer auth:
+
+```bash
+/opt/data/home/.local/bin/xurl auth default app32749964
+/opt/data/home/.local/bin/xurl --auth app "/2/lists/1585430245762441216/tweets?max_results=40&tweet.fields=created_at,author_id,text,public_metrics,entities&expansions=author_id&user.fields=name,username"
+```
+
+This saves raw JSON to stdout — pipe to a file, then parse with Python. Bearer tokens in xurl outlive OAuth2 user tokens.
+
+## How to Fully Re-auth
+
+When even the bearer + refresh routes fail, the only fix is a full PKCE re-auth via xurl:
+
+```bash
+/opt/data/home/.local/bin/xurl auth default app32749964
+/opt/data/home/.local/bin/xurl auth oauth2
+```
+
+This requires interactive browser access — not possible in headless cron. If cron hits this wall, report the failure and flag manual re-auth needed.
+
 ## Pitfalls
 
 - Token expires every 2 hours — refresh before expiry or on 401 errors
+- xapi.py has NO built-in token refresh — if you get 401, try the xurl bearer fallback first
 - List endpoint max is 100 tweets per request, pagination via `pagination_token`
 - Retweets show original author_id but the text includes "RT @user:" prefix
 - Rate limits: 900/15min for app-only, 900/15min for user auth on most endpoints
