@@ -92,7 +92,9 @@ Example structure:
 
 ## Workflow
 
-1. **Fetch** the transcript using the helper script with `--text-only --timestamps`.
+1. **Fetch** the transcript using the helper script.
+   - For **JSON output** (with `timestamped_text` and `full_text` metadata): use `--timestamps` flag alone. Do NOT combine `--text-only` with `--timestamps` — the `--text-only` flag returns only a plain text string with no JSON wrapper, no `timestamped_text` field, and no metadata fields.
+   - For **plain text only**: use `--text-only` alone.
 2. **Validate**: confirm the output is non-empty and in the expected language. If empty, retry without `--language` to get any available transcript. If still empty, tell the user the video likely has transcripts disabled.
 3. **Chunk if needed**: if the transcript exceeds ~50K characters, split into overlapping chunks (~40K with 2K overlap) and summarize each chunk before merging.
 4. **Transform** into the requested output format. If the user did not specify a format, default to Luna digest style.
@@ -102,9 +104,9 @@ Example structure:
 
 - **System python3 missing youtube-transcript-api**: On this server, system `python3` has no pip and `uv pip install` doesn't install to it. The module is pre-installed in `/opt/hermes/.venv/bin/python`. Always run the script with that interpreter:
   ```bash
-  /opt/hermes/.venv/bin/python SKILL_DIR/scripts/fetch_transcript.py "URL" --text-only --timestamps
+  /opt/hermes/.venv/bin/python SKILL_DIR/scripts/fetch_transcript.py "URL" --timestamps
   ```
-  Do NOT use bare `python3` — it will fail with "youtube-transcript-api not installed."
+  Do NOT use bare `python3` — it will fail with "youtube-transcript-api not installed." Do NOT use `--text-only --timestamps` together — `--text-only` overrides JSON output entirely.
 
 - **Cloud IP blocking**: YouTube blocks transcript requests from cloud provider IPs (AWS, GCP, Azure). The script returns a JSON error: `{"error": "Could not retrieve a transcript..."}`. Workarounds:
   - Use a residential proxy or VPN
@@ -121,6 +123,7 @@ Example structure:
     "timestamped_text": "0:00 first line\n0:02 second line\n..."
   }
   ```
+  Note: the JSON does **not** include a `title` field. To get the video title, fetch it from the page via `browser_navigate` and read the page `<title>` element, or extract it from the URL context.
   The `timestamped_text` field uses `M:SS text` format (no brackets). To get `[MM:SS] text` format, parse and reformat. The `--text-only` flag returns just the plain text string.
 
 ## Error Handling
