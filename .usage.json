@@ -1,0 +1,74 @@
+{
+  "paper-publish": {
+    "archived_at": null,
+    "created_at": "2026-05-04T05:41:18.997038+00:00",
+    "last_patched_at": null,
+    "last_used_at": "2026-05-04T05:41:19.004131+00:00",
+    "last_viewed_at": "2026-05-04T05:41:18.997061+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 1,
+    "view_count": 1
+  },
+  "paper-summary-workflow": {
+    "archived_at": null,
+    "created_at": "2026-05-03T04:42:00.981472+00:00",
+    "last_patched_at": null,
+    "last_used_at": "2026-05-04T05:41:05.246756+00:00",
+    "last_viewed_at": "2026-05-04T05:41:05.239588+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 2
+  },
+  "web-session-authentication": {
+    "archived_at": null,
+    "created_at": "2026-05-04T01:45:41.645851+00:00",
+    "last_patched_at": "2026-05-04T03:26:15.822894+00:00",
+    "last_used_at": "2026-05-04T03:26:09.172552+00:00",
+    "last_viewed_at": "2026-05-04T03:26:09.156956+00:00",
+    "patch_count": 2,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 2
+  },
+  "work-queue-management": {
+    "archived_at": null,
+    "created_at": "2026-05-03T04:51:19.674925+00:00",
+    "last_patched_at": null,
+    "last_used_at": "2026-05-03T04:51:19.681927+00:00",
+    "last_viewed_at": "2026-05-03T04:51:19.674953+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 1,
+    "view_count": 1
+  },
+  "x-digest": {
+    "archived_at": null,
+    "created_at": "2026-05-04T09:00:19.265288+00:00",
+    "last_patched_at": null,
+    "last_used_at": "2026-05-05T03:36:41.419528+00:00",
+    "last_viewed_at": "2026-05-05T03:36:41.411179+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 1
+  },
+  "x-twitter-digest": {
+    "archived_at": null,
+    "created_at": "2026-05-04T01:30:19.577992+00:00",
+    "last_patched_at": "2026-05-04T05:47:45.221383+00:00",
+    "last_used_at": "2026-05-04T05:40:44.585829+00:00",
+    "last_viewed_at": "2026-05-04T05:40:44.578648+00:00",
+    "patch_count": 2,
+    "pinned": false,
+    "state": "active",
+    "use_count": 4,
+    "view_count": 4
+  }
+}
