@@ -338,7 +338,6 @@ Edit with `hermes config edit` or `hermes config set section.key value`.
 | `memory` | `memory_enabled`, `user_profile_enabled`, `provider` |
 | `security` | `tirith_enabled`, `website_blocklist` |
 | `delegation` | `model`, `provider`, `base_url`, `api_key`, `max_iterations` (50), `reasoning_effort` |
-| `smart_model_routing` | `enabled`, `cheap_model` |
 | `checkpoints` | `enabled`, `max_snapshots` (50) |
 
 Full config reference: https://hermes-agent.nousresearch.com/docs/user-guide/configuration
@@ -565,6 +564,13 @@ Common gateway problems:
 - **Discord bot silent**: Must enable **Message Content Intent** in Bot → Privileged Gateway Intents.
 - **Slack bot only works in DMs**: Must subscribe to `message.channels` event. Without it, the bot ignores public channels.
 - **Windows HTTP 400 "No models provided"**: Config file encoding issue (BOM). Ensure `config.yaml` is saved as UTF-8 without BOM.
+- **Mattermost not responding**: Three things must all be configured:
+  1. **Enable in config.yaml**: `platforms.mattermost.enabled: true` (env vars alone won't enable it)
+  2. **Set env vars**: `MATTERMOST_URL`, `MATTERMOST_TOKEN`, `MATTERMOST_USER`
+  3. **Set allowlist**: Either `MATTERMOST_ALLOWED_USERS=user_id[,id...]` OR `MATTERMOST_ALLOW_ALL_USERS=true`
+  - Without the allowlist, inbound messages are **silently denied** — gateway accepts them but never responds.
+  - Check logs at `~/.hermes/logs/gateway.log` or `/opt/data/logs/`
+  - Channel IDs are different from channel names — get IDs via Mattermost API or browser dev tools.
 
 ### Auxiliary models not working
 If `auxiliary` tasks (vision, compression, session_search) fail silently, the `auto` provider can't find a backend. Either set `OPENROUTER_API_KEY` or `GOOGLE_API_KEY`, or explicitly configure each auxiliary task's provider:
