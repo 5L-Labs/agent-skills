@@ -171,9 +171,9 @@ For local PDF processing, see the `ocr-and-documents` skill.
 
 Full list: https://arxiv.org/category_taxonomy
 
-## Helper Script
+### Helper Script
 
-The `scripts/search_arxiv.py` script handles XML parsing and provides clean output:
+For convenient command-line usage, a helper script `search_arxiv.py` is available that handles XML parsing and provides clean output. You can create it manually by saving the reference implementation from `references/search_arxiv_script.py` to `scripts/search_arxiv.py` in your Hermes directory.
 
 ```bash
 python scripts/search_arxiv.py "GRPO reinforcement learning"
@@ -184,7 +184,9 @@ python scripts/search_arxiv.py --id 2402.03300
 python scripts/search_arxiv.py --id 2402.03300,2401.12345
 ```
 
-No dependencies — uses only Python stdlib.
+The reference implementation includes proper error handling and supports additional options like category filtering and custom sorting.
+
+**Note:** If you encounter API rate limits, add delays between requests or use the browser-based fallback method described below.
 
 ---
 
@@ -256,11 +258,19 @@ If the arXiv API returns "Rate exceeded", use a `sleep` interval (at least 3-5 s
 ```bash
 curl -s -A "Mozilla/5.0" "https://export.arxiv.org/api/query?..."
 ```
-If programmatic access fails, fall back to scraping the recent listings page directly:
+
+If programmatic access continues to fail, fall back to browsing the recent listings page directly:
 ```bash
 curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent"
 ```
 
+**Alternative manual workflow when API is blocked:**
+1. Use the browser to navigate to https://arxiv.org/list/cs.CL/recent
+2. Search within the page for papers mentioning your topic
+3. Click on individual paper links to read abstracts
+4. Use the Semantic Scholar API (see below) for citation data and recommendations
+
+This hybrid approach ensures you can always access recent papers even when the API is rate-limited.
 
 | API | Rate | Auth |
 |-----|------|------|

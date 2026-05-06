@@ -1,7 +1,7 @@
 ---
 name: x-digest
 description: Fetch and summarize X/Twitter list feeds into a digest format. Uses the xapi.py wrapper for OAuth2-authenticated API calls.
-version: 2.0.0
+version: 2.0.1
 author: Hermes Agent
 metadata:
   hermes:
@@ -10,48 +10,64 @@ metadata:
 
 # x-digest — X/Twitter List Digest
 
-Fetches tweets from X lists and formats them as a readable digest. Uses the OAuth2 token stored at `/opt/data/config/x-oauth2-tokens.json`.
+Fetches tweets from X lists and formats them as a readable digest. Supports both OAuth2 and OAuth1 authentication.
 
 ## Prerequisites
 
-- Working OAuth2 token in `/opt/data/config/x-oauth2-tokens.json`
+- Working OAuth2 token in `/opt/data/config/x-oauth2-tokens.json` OR OAuth1 credentials configured via `xurl auth oauth1`
 - Python 3 (urllib, json — stdlib only, no pip deps)
 
 ## Quick Start
 
 ```bash
-# Fetch latest from AI High Signal list
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 20
+# Fetch latest from AI High Signal list (OAuth2)
+# xurl --app hermes /lists/1585430245762441216/tweets --max 20
 
-# Fetch bookmarks
-python3 /opt/data/scripts/xapi.py bookmarks --max 10
+# OR (OAuth1)
+xurl --app hermes --auth oauth1 /lists/1585430245762441216/tweets --max 20
 
-# Search
-python3 /opt/data/scripts/xapi.py search "AI agents" --max 10
+# Fetch bookmarks (OAuth2)
+# xurl --app hermes bookmarks
+
+# OR (OAuth1)
+xurl --app hermes --auth oauth1 bookmarks
+
+# Search (OAuth2)
+# xurl --app hermes search "AI agents" --max 10
+
+# OR (OAuth1)
+xurl --app hermes --auth oauth1 search "AI agents" --max 10
 
 # JSON output for programmatic use
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 20 --json
+# xurl --app hermes /lists/1585430245762441216/tweets --max 20 --json
+
+# OR (OAuth1)
+xurl --app hermes --auth oauth1 /lists/1585430245762441216/tweets --max 20 --json
 
 # Links-only output (for appending to digests)
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 20 --links-only
+# xurl --app hermes /lists/1585430245762441216/tweets --max 20 --format links
+
+# OR (OAuth1)
+xurl --app hermes --auth oauth1 /lists/1585430245762441216/tweets --max 20 --format links
 
 # Validate a digest for broken URLs
 python3 /opt/data/scripts/xapi.py digest-validate /path/to/digest.txt
 ```
 
-## Wrapper API
+## xurl API Interface
 
-`/opt/data/scripts/xapi.py` provides:
+`xurl` provides a rich CLI for X API access. Key commands for the digest workflow:
 
 | Command | Description |
 |---------|-------------|
-| `list-tweets LIST_ID [--max N] [--json] [--links-only]` | Tweets from an X list |
-| `search "query" [--max N] [--json] [--links-only]` | Search recent tweets |
-| `bookmarks [--max N] [--json] [--links-only]` | User bookmarks |
-| `user USERNAME` | Look up user by handle |
-| `user-id USER_ID` | Look up user by ID |
-| `timeline USER_ID [--max N]` | User timeline |
-| `digest-validate FILE` | Validate URLs in a digest file (exit 0=pass, 1=fail) |
+| `xurl --app hermes [ --auth oauth1 ] /lists/LIST_ID/tweets [--max N] [--json] [--format links]` | Tweets from an X list |
+| `xurl --app hermes [ --auth oauth1 ] search "query" [--max N] [--json] [--format links]` | Search recent tweets |
+| `xurl --app hermes [ --auth oauth1 ] bookmarks [--max N] [--json] [--format links]` | User bookmarks |
+| `xurl --app hermes [ --auth oauth1 ] user USERNAME` | Look up user by handle |
+| `xurl --app hermes [ --auth oauth1 ] user-id USER_ID` | Look up user by ID |
+| `xurl --app hermes [ --auth oauth1 ] /users/USER_ID/tweets [--max N]` | User timeline |
+| `xurl auth apps add NAME --client-id ID --client-secret SECRET` | Register a new app |
+| `xurl auth default NAME` | Set default app |
 
 ## Known Lists
 
@@ -65,7 +81,9 @@ python3 /opt/data/scripts/xapi.py digest-validate /path/to/digest.txt
 
 ### Step 0: Pre-flight — refresh token
 
-Always refresh the OAuth2 token before fetching tweets. Token expires every 2 hours.
+**OAuth2 users:** Always refresh the OAuth2 token before fetching tweets. Token expires every 2 hours.
+
+**OAuth1 users:** If you have configured OAuth1 credentials via `xurl auth oauth1`, you can skip the token refresh step.
 
 If refresh fails (network/invalid tokens), fall back to locally cached recent tweets or mark task as requiring manual auth. Do NOT proceed with stale/missing data if freshness is required.
 
@@ -73,13 +91,13 @@ If refresh fails (network/invalid tokens), fall back to locally cached recent tw
 
 ```bash
 # Full output for the LLM to read
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 40 > /tmp/digest_tweets.txt
+xurl --app hermes --auth oauth1 /lists/1585430245762441216/tweets --max 40 > /tmp/digest_tweets.txt
 
 # Links-only output — NEVER let the LLM touch this
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 40 --links-only > /tmp/digest_links.txt
+xurl --app hermes --auth oauth1 /lists/1585430245762441216/tweets --max 40 --format links > /tmp/digest_links.txt
 ```
 
-If API returns 401/403, log the auth error and skip automated posting. Notify operator to refresh credentials.
+If API returns 401/403, log the auth error and skip automated posting. Notify operator to refresh credentials or re-authorize.
 
 ### Step 2: Write thematic summary
 
@@ -113,7 +131,7 @@ If validation fails (exit code 1), fix the broken URLs before posting. If valida
 Append a JSONL entry to `/opt/data/logs/digest-runs.jsonl`:
 
 ```json
-{"ts": "ISO_TIMESTAMP", "status": "ok|broken|error", "urls_total": N, "urls_valid": N, "urls_broken": N, "note": "brief description"}
+{\"ts\": \"ISO_TIMESTAMP\", \"status\": \"ok|broken|error\", \"urls_total\": N, \"urls_valid\": N, \"urls_broken\": N, \"note\": \"brief description\"}
 ```
 
 This enables success rate tracking over time.
@@ -130,7 +148,19 @@ User prefers PLAIN TEXT digests:
 
 ## Primary API Interface
 
-`/opt/data/scripts/xapi.py` is the primary way to call X APIs. Do NOT use `xurl --auth oauth2` — its config parser doesn't pick up manually-injected tokens. The wrapper reads tokens from `/opt/data/config/x-oauth2-tokens.json` directly.
+**Use xurl for all X API calls.** The tool is installed at `/opt/data/home/.local/bin/xurl` (or in PATH). Configure apps with `xurl auth apps add`.
+
+## Authentication Modes
+
+xurl supports two main authentication types:
+
+- **App authentication** (`--app NAME`): Uses client credentials to get an app-only bearer token. No user interaction required. Best for reading public data.
+- **OAuth2 authentication** (`--auth oauth2`): Requires user authorization via browser. Use when you need to access private user data (bookmarks, DMs, etc.).
+- **OAuth1 authentication** (`--auth oauth1`): Uses user credentials (consumer key/secret and access token/secret). Ideal for headless environments.
+
+For the digest workflow, use `--app hermes` for list tweets and search. Use `--auth oauth1` for all user-requiring endpoints when using OAuth1 credentials.
+
+**Note:** OAuth1 credentials can be configured using `xurl auth oauth1`. This method does not require a browser and is fully compatible with all user-context endpoints.
 
 ## Cron Jobs
 
@@ -140,17 +170,18 @@ Format preference: plain conversational summaries grouped by theme, with raw twe
 
 ## Pitfalls
 
-- Token expires every 2 hours — refresh before every run (Step 0)
+- Token expires every 2 hours — refresh before every run (Step 0 for OAuth2)
 - List endpoint max is 100 tweets per request, pagination via `pagination_token`
-- Retweets show original author_id but the text includes "RT @user:" prefix
+- Retweets show original author_id but the text includes \"RT @user:\" prefix
 - Rate limits: 900/15min for app-only, 900/15min for user auth on most endpoints
-- Bookmarks endpoint requires actual user_id (e.g. `43469078`), NOT `me` — `/users/me/bookmarks` returns 400. The wrapper handles this automatically by reading user_id from the token file.
 - NEVER let the LLM construct or rewrite tweet URLs — always use `--links-only` output verbatim
+- **When updating credentials, verify you're modifying the correct field (access_token vs client_secret_app32749964). Double-check the field name before applying changes.**
+- When the X API is unavailable (e.g., 401/403 or network issues):
 
 ## Fallback for API unavailability
 
 When the X API is unavailable (e.g., 401/403 or network issues):
-- Log the error with timestamp and status "error"
+- Log the error with timestamp and status \"error\"
 - Do NOT post an automated digest
 - Optionally use a cached/recent snapshot if acceptable to the user
 - Require manual intervention to resolve credentials or accept a delayed digest
