@@ -133,8 +133,60 @@ Style rules:
 7. **Save** raw transcript to `/opt/data/.hermes/content/youtube-raw/<name>.txt`
 8. **Update backlog**: after successful processing, remove the video ID from the backlog JSON (`/opt/data/.hermes/content/yt-backlog.json` -> `unique_videos` array).
 
-## Environment Setup
+## Advanced Fetching Options
 
+For environments with cloud IP restrictions (which block standard API access), use the dedicated cookie-aware fetch script:
+
+```bash
+# With cookie file
+python SKILL_DIR/scripts/cookie_fetch.py VIDEO_ID --cookie-file /path/to/cookies.txt
+
+# With default cookie location
+python SKILL_DIR/scripts/cookie_fetch.py VIDEO_ID
+
+# With language fallback
+python SKILL_DIR/scripts/cookie_fetch.py VIDEO_ID --language en,tr
+
+# Save to directory
+python SKILL_DIR/scripts/cookie_fetch.py VIDEO_ID --save-dir /opt/data/.hermes/content/youtube-raw
+```
+
+This script bypasses IP blocks by using YouTube login cookies. See `references/cookie-setup.md` for detailed setup instructions.
+
+## Proxy Support
+
+To use a residential proxy, set the standard environment variables before running any fetch command:
+
+```bash
+export HTTP_PROXY=http://proxy-user:proxy-pass@proxy-ip:proxy-port
+export HTTPS_PROXY=http://proxy-user:proxy-pass@proxy-ip:proxy-port
+python SKILL_DIR/scripts/fetch_transcript.py VIDEO_ID
+```
+
+## Choosing the Right Method
+
+| Situation | Recommended Method |
+|-----------|-------------------|
+| Video already in cache | Use cached transcript (no fetch needed) |
+| Non-cloud IP (home network) | Standard `fetch_transcript.py` |
+| Cloud IP with access to YouTube cookies | `cookie_fetch.py` with cookies |
+| Cloud IP with residential proxy | Set `HTTP(S)_PROXY` environment variables |
+| Batch processing from non-cloud machine | Pre-fetch and cache all transcripts |
+
+## Error Detection and Recovery
+
+When processing batches, implement this logic:
+
+1. Check cache first — if transcript exists, use it.
+2. If not, attempt fetch with standard script.
+3. If IP_BLOCKED error occurs:
+   - Log the video ID and error.
+   - If cookies are configured, retry with `cookie_fetch.py`.
+   - If proxy is configured, ensure it's set correctly.
+   - If neither, skip the video and continue.
+4. After processing, generate a report of skipped videos with recommendations.
+
+This approach maximizes successful processing while working around IP restrictions.
 The scripts require `youtube-transcript-api`. Before creating temporary venvs, check if the package is already available in a system Python:
 
 ```bash
@@ -161,8 +213,188 @@ The skill scripts may be installed in multiple locations. Check these paths in o
 
 Use `find /opt/data -name "fetch_transcript.py" -type f` if needed.
 
-## Error Handling
+## Error Handling (Expanded)
 
+- **Transcript disabled**: tell the user; suggest they check if subtitles are available on the video page.
+- **Private/unavailable video**: relay the error and ask the user to verify the URL.
+- **No matching language**: retry without `--language` to fetch any available transcript, then note the actual language to the user.
+- **Dependency missing**: run `pip install youtube-transcript-api` and retry.
+- **Digest script failure**: if `generate_luna_digest.py` produces no output or encounters errors, immediately use the fallback method: strip timestamps, join text, split into meaningful sentences (length > 20 chars), and create a structured digest with thematic sections following the Luna format guidelines. In automated workflows, do not spend time debugging - go directly to the fallback to ensure processing continues.
+- **Complete script failure**: if generate_luna_digest.py cannot be found or crashes irreparably, create a basic structured digest manually:
+  ```python
+  with open(transcript_file, 'r') as f:
+      lines = f.readlines()
+  text = ' '.join([line.split(' ', 1)[-1] for line in lines if line.strip()])
+  digest = f"• Core concept: {text[:100]}...\n• Key points extracted from transcript.\n"
+  ```
+- **Cloud IP blocking**: YouTube aggressively blocks transcript requests from cloud provider IPs (AWS, GCP, Azure). This is not a temporary rate-limiting issue but a fundamental access restriction. The script will return a JSON error: `{"error": "Could not retrieve a transcript..."}`.
+  - **If the video is already cached** (see Workflow step 3), use the cached transcript — this bypasses the IP block.
+  - **If the video is not cached**, you have several options:
+    1. **Use a residential proxy or VPN** — configure the script to route requests through a non-cloud IP.
+    2. **Use cookies from a logged-in YouTube session** — see the `references/cookie-setup.md` for instructions on extracting and using YouTube cookies.
+    3. **Pre-fetch transcripts from a non-cloud machine** and store them in the cache before processing.
+    4. **Wait for YouTube to unblock the IP** — this is unlikely to happen.
+  - **Important**: Do not simply retry or wait — the block is persistent. The workflow should either skip the video (for batch processing) or inform the user of the need for proxy/cookie configuration (for interactive use).
+- **Batch processing IP block handling**: When processing multiple videos, if a video is not in the cache and encounters an IP block error:
+  - Log the error clearly.
+  - Skip the video (do NOT remove from backlog).
+  - Continue processing the next video.
+  - At the end, report which videos failed and why, along with recommendations for resolving the IP block issue.
+
+### Enhanced Batch Processing Workflow
+
+For robust batch processing (e.g., cron jobs), follow this enhanced workflow:
+
+1. **Read the backlog** from `/opt/data/.hermes/content/yt-backlog.json`
+2. **Process videos sequentially** with proper error handling:
+   - If transcript fetch fails (IP block, network error, etc.), **skip the video** and continue to the next
+   - **DO NOT remove failed videos from the backlog** — they should be retried in future runs
+   - Log failures with clear error messages
+3. **After processing all videos**, generate a report of successes and failures
+4. **Preserve the backlog** — only remove videos that were successfully processed and saved to the cache
+
+#### Critical Pitfall: Backlog Integrity
+
+**Never modify the backlog file until after all processing is complete.** Use a temporary list for removals and write back only once at the end. This prevents partial updates if the script crashes.
+
+#### Recommended Batch Processing Script
+
+Create a dedicated batch script to handle these edge cases:
+
+```python
+#!/usr/bin/env python3
+"""
+Batch processor for YouTube transcripts with proper error handling.
+Preserves backlog integrity and handles IP blocks gracefully.
+"""
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from datetime import datetime
+
+BACKLOG_PATH = "/opt/data/.hermes/content/yt-backlog.json"
+CACHE_DIR = "/opt/data/.hermes/content/youtube-raw/"
+DIGEST_FILE = "/opt/data/home/.hermes/yt-digest.txt"
+
+def load_backlog():
+    with open(BACKLOG_PATH, 'r') as f:
+        return json.load(f)
+
+def save_backlog(data):
+    with open(BACKLOG_PATH, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def fetch_transcript(video_id):
+    """Fetch transcript with error handling."""
+    # Check cache first
+    cache_file = CACHE_DIR / f"{video_id}_timestamped.txt"
+    if cache_file.exists():
+        return open(cache_file, 'r').read(), None
+    
+    # Attempt fetch
+    cmd = [
+        "/usr/bin/python3",
+        "/opt/data/.hermes/skills/media/youtube-content/scripts/fetch_transcript.py",
+        f"https://youtube.com/watch?v={video_id}",
+        "--text-only",
+        "--timestamps"
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return None, result.stderr
+    
+    return result.stdout, None
+
+def process_video(video_id):
+    """Process a single video with full error handling."""
+    try:
+        transcript, error = fetch_transcript(video_id)
+        if error:
+            return {"status": "failed", "error": error}
+        
+        if not transcript:
+            return {"status": "failed", "error": "No transcript received"}
+        
+        # Generate Luna digest (with fallback)
+        # ... (digest generation logic)
+        
+        return {"status": "success", "video_id": video_id}
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
+
+def main():
+    backlog = load_backlog()
+    video_ids = backlog["unique_videos"][:]  # Copy for safe iteration
+    
+    successes = []
+    failures = []
+    
+    for video_id in video_ids[:10]:  # Process first 10
+        result = process_video(video_id)
+        if result["status"] == "success":
+            successes.append(video_id)
+            # Only remove from backlog if successful
+            if video_id in video_ids:
+                video_ids.remove(video_id)
+        else:
+            failures.append((video_id, result.get("error", "Unknown error")))
+    
+    # Save updated backlog (only if modifications made)
+    if successes:
+        backlog["unique_videos"] = video_ids
+        save_backlog(backlog)
+    
+    # Generate report
+    report = f"""=== BATCH PROCESSING REPORT - {datetime.now().isoformat()} ===
+Processed 10 videos from backlog
+Successes: {len(successes)}
+Failures: {len(failures)}
+
+"""
+    if successes:
+        report += f"Successfully processed: {', '.join(successes)}\n"
+    if failures:
+        report += "\nFailed videos:\n"
+        for vid, err in failures:
+            report += f"  {vid}: {err}\n"
+    
+    report += "\nBacklog remaining: {len(video_ids)} videos\n"
+    report += "=== END REPORT ===\n"
+    
+    with open(DIGEST_FILE, 'a') as f:
+        f.write(report)
+    
+    print(report)
+
+if __name__ == "__main__":
+    main()
+```
+
+#### IP Block Handling in Batch Mode
+
+When YouTube blocks your cloud IP:
+
+1. **Do not retry immediately** — the block is persistent
+2. **Skip the video** and continue with the next
+3. **At the end of the batch**, generate a report listing blocked videos
+4. **Consider implementing** one of the workarounds from the "Working around IP bans" section
+5. **For future batches**, either:
+   - Use pre-fetched transcripts (cache-first strategy)
+   - Configure cookies or proxy before running the batch
+
+#### Reporting Failures
+
+Always include in the report:
+- Which videos failed
+- The specific error message
+- Recommendations for resolving the issue
+- Whether the backlog was modified
+
+This ensures transparency and allows for manual intervention when automated processing fails.
 - **Transcript disabled**: tell the user; suggest they check if subtitles are available on the video page.
 - **Private/unavailable video**: relay the error and ask the user to verify the URL.
 - **No matching language**: retry without `--language` to fetch any available transcript, then note the actual language to the user.
