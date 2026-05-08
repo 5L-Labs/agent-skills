@@ -124,3 +124,13 @@ Format preference: plain conversational summaries grouped by theme, with raw twe
 - Retweets show original author_id but the text includes "RT @user:" prefix
 - Rate limits: 900/15min for app-only, 900/15min for user auth on most endpoints
 - Bookmarks endpoint requires actual user_id (e.g. `43469078`), NOT `me` — `/users/me/bookmarks` returns 400. The wrapper handles this automatically by reading user_id from the token file.
+- Token file corruption: the token file at `/opt/data/config/x-oauth2-tokens.json` may get truncated or redacted (values replaced with `...`). If xapi.py returns 401 AND token refresh also returns 401 ("unauthorized_client" or "Missing valid authorization header"), the token file is corrupted. The file's raw bytes must be inspected — `json.load()` looks fine but the stored tokens may be incomplete. To detect: check that access_token length is ~100+ chars and refresh_token is ~90+ chars with base64 content, not literal `...`. If corrupted, the API credentials need to be regenerated via a fresh OAuth2 flow using `xurl auth login`.
+
+## Diagnosing 401 Errors
+
+When xapi.py returns HTTP 401:
+1. First try: refresh the token using the refresh_token grant
+2. If refresh also returns 401 with "unauthorized_client": the client_id/client_secret pair is invalid or the app has been revoked — need to register a new app in the X developer portal
+3. If refresh returns 401 but client credentials are OK: the refresh_token itself is expired/revoked — need a full re-auth flow via `xurl auth login` or browser-based OAuth2 authorization
+4. Inspect the raw token file bytes, not just `json.load()` output — the file can appear valid JSON while containing truncated token values
+5. Do NOT use `xurl --auth oauth2` for API calls — it tries interactive browser auth even when tokens exist. Always use xapi.py which reads the token file directly
