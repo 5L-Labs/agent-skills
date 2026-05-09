@@ -120,6 +120,8 @@ Format preference: plain conversational summaries grouped by theme, with raw twe
 ## Pitfalls
 
 - Token expires every 2 hours — refresh before expiry or on 401 errors
+- Refresh can also fail with `unauthorized_client` / "Missing valid authorization header" — this means the client credentials (client_id/client_secret) in the token file are stale or invalid. Try all three refresh methods below; if ALL fail, the app credentials at developer.x.com need to be rotated and a new OAuth2 flow completed.
+- Refresh methods to try (in order): (1) Basic auth header with `client_id:client_secret`, (2) `x-client-identifier` header only (PKCE-style, no Basic auth), (3) Both Basic auth AND `x-client-identifier` together. Some X app configs require one or the other.
 - List endpoint max is 100 tweets per request, pagination via `pagination_token`
 - Retweets show original author_id but the text includes "RT @user:" prefix
 - Rate limits: 900/15min for app-only, 900/15min for user auth on most endpoints
