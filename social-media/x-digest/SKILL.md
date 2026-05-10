@@ -53,30 +53,51 @@ python3 /opt/data/scripts/xapi.py digest-validate /path/to/digest.txt
 | `timeline USER_ID [--max N]` | User timeline |
 | `digest-validate FILE` | Validate URLs in a digest file (exit 0=pass, 1=fail) |
 
+## Quick Start
+
+```bash
+# Fetch latest from AI High Signal list (comprehensive)
+python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 50
+
+# Fetch ALL tweets from the list (multiple pages)
+python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 100 --all
+
+# Fetch bookmarks
+python3 /opt/data/scripts/xapi.py bookmarks --max 10
+
+# Search
+python3 /opt/data/scripts/xapi.py search "AI agents" --max 10
+
+# JSON output for programmatic use
+python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 50 --json
+
+# Links-only output (for appending to digests)
+python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 50 --links-only
+```
+
 ## Known Lists
 
-| Name | List ID |
-|------|---------|
-| AI High Signal | 1585430245762441216 |
-| Concentrate | 207282755 |
-| High-Level Work Related | 204414139 |
+| Name | List ID | Recommended Max |
+|------|---------|-----------------|
+| AI High Signal | 1585430245762441216 | 50 (100 with --all) |
+| Concentrate | 207282755 | 50 (100 with --all) |
+| High-Level Work Related | 204414139 | 50 (100 with --all) |
+
+**Note:** For comprehensive digests, use `--max 100`. If timeout issues occur (common in headless environments), reduce to `--max 50-60` for reliable execution.
 
 ## Digest Workflow (hardened + fallback for API issues)
 
-### Step 0: Pre-flight — refresh token
-
-Always refresh the OAuth2 token before fetching tweets. Token expires every 2 hours.
-
-If refresh fails (network/invalid tokens), fall back to locally cached recent tweets or mark task as requiring manual auth. Do NOT proceed with stale/missing data if freshness is required.
+### Step 0: Pre-flight — refresh token & check cache
+\n\nAlways refresh the OAuth2 token before fetching tweets. Token expires every 2 hours.\n\nIf refresh fails (network/invalid tokens), fall back to locally cached recent tweets or mark task as requiring manual auth. Do NOT proceed with stale/missing data if freshness is required.\n\nAdditionally, check if the tweets are already cached on disk. If a fresh cache exists (less than 30 days old), use it instead of making an API call to reduce costs.
 
 ### Step 1: Fetch tweets (full + links-only)
 
 ```bash
 # Full output for the LLM to read
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 40 > /tmp/digest_tweets.txt
+python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 50 > /tmp/digest_tweets.txt
 
 # Links-only output — NEVER let the LLM touch this
-python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 40 --links-only > /tmp/digest_links.txt
+python3 /opt/data/scripts/xapi.py list-tweets 1585430245762441216 --max 50 --links-only > /tmp/digest_links.txt
 ```
 
 If API returns 401/403, log the auth error and skip automated posting. Notify operator to refresh credentials.
@@ -142,10 +163,12 @@ Format preference: plain conversational summaries grouped by theme, with raw twe
 
 - Token expires every 2 hours — refresh before every run (Step 0)
 - List endpoint max is 100 tweets per request, pagination via `pagination_token`
-- Retweets show original author_id but the text includes "RT @user:" prefix
+- Retweets show original author_id but the text includes `"RT @user:"` prefix
 - Rate limits: 900/15min for app-only, 900/15min for user auth on most endpoints
 - Bookmarks endpoint requires actual user_id (e.g. `43469078`), NOT `me` — `/users/me/bookmarks` returns 400. The wrapper handles this automatically by reading user_id from the token file.
 - NEVER let the LLM construct or rewrite tweet URLs — always use `--links-only` output verbatim
+- **Caching**: Responses are cached to disk for **30 days** to reduce XAPI costs. See `references/caching.md` for technical details.
+- If `digest-validate` fails with many broken URLs, consult `references/xapi-debugging.md` for common issues and fixes.
 
 ## Fallback for API unavailability
 
