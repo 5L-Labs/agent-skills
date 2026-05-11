@@ -117,6 +117,20 @@ The `ai-high-signal-digest` cron job runs daily at 09:00 UTC, delivering themati
 
 Format preference: plain conversational summaries grouped by theme, with raw tweet links at the end. No fancy markdown, no emoji section dividers.
 
+## Troubleshooting Auth Failures
+
+### 401 on API call → refresh the token
+Run the token refresh script above. This handles routine 2-hour expiry.
+
+### 401 on refresh itself → check the error body
+If the refresh endpoint returns 401, read the error body:
+- `"unauthorized_client"` / `"Missing valid authorization header"` — the Basic auth header used the raw (URL-safe base64-encoded) `client_id` instead of the decoded client key. Decode it first: `base64.urlsafe_b64decode(tokens['client_id'] + '==').decode()`.
+- `"invalid_grant"` — the refresh token is expired/revoked. Regenerate from the X Developer Portal.
+- `"refresh_token parameter is invalid"` (error code 44) — the refresh token was permanently invalidated. The access token + refresh token pair must be fully regenerated from https://developer.x.com/en/portal/dashboard for the app (client ID `e56xwdp7JUVD-3ak6tSi`).
+
+### No fallback available
+There is no app-only bearer token or API key backup for authenticated endpoints like list tweets. If OAuth2 is broken, the digest cannot run until tokens are regenerated.
+
 ## Pitfalls
 
 - Token expires every 2 hours — refresh before expiry or on 401 errors
@@ -124,3 +138,4 @@ Format preference: plain conversational summaries grouped by theme, with raw twe
 - Retweets show original author_id but the text includes "RT @user:" prefix
 - Rate limits: 900/15min for app-only, 900/15min for user auth on most endpoints
 - Bookmarks endpoint requires actual user_id (e.g. `43469078`), NOT `me` — `/users/me/bookmarks` returns 400. The wrapper handles this automatically by reading user_id from the token file.
+- The `client_id` stored in the token file is URL-safe base64-encoded; the decoded form (`e56xwdp7JUVD-3ak6tSi:1:ci`) goes in the Authorization Basic header for token refresh, not the raw encoded string.
