@@ -121,7 +121,22 @@ Example structure:
     "timestamped_text": "0:00 first line\n0:02 second line\n..."
   }
   ```
-  The `timestamped_text` field uses `M:SS text` format (no brackets). To get `[MM:SS] text` format, parse and reformat. The `--text-only` flag returns just the plain text string.
+  The `timestamped_text` field uses `M:SS text` format (no brackets). To get `[MM:SS] text` format, parse and reformat.
+
+  **3-part timestamps on long videos**: For videos over ~60 minutes, timestamps switch from `M:SS` (2-part, e.g., `59:42`) to `H:MM:SS` (3-part, e.g., `1:00:04`). A naive regex like `^(\d+):(\d{2})` will NOT match 3-part timestamps — the line is silently skipped, producing a partially-formatted transcript. Always check 3-part FIRST before 2-part:
+  ```python
+  def format_timestamp(line):
+      m = re.match(r'^(\d+):(\d{2}):(\d{2})\s+(.*)', line)
+      if m:
+          total_mins = int(m.group(1)) * 60 + int(m.group(2))
+          return f"[{total_mins:02d}:{m.group(3)}] {m.group(4)}"
+      m = re.match(r'^(\d+):(\d{2})\s+(.*)', line)
+      if m:
+          return f"[{int(m.group(1)):02d}:{m.group(2)}] {m.group(3)}"
+      return line
+  ```
+
+  The `--text-only` flag returns just the plain text string.
 
 ## Error Handling
 
