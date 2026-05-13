@@ -572,6 +572,38 @@ Common gateway problems:
   - Check logs at `~/.hermes/logs/gateway.log` or `/opt/data/logs/`
   - Channel IDs are different from channel names — get IDs via Mattermost API or browser dev tools.
 
+### Upgrading Hermes Agent
+
+**Before any upgrade, always back up user data first.** The upgrade wipes `/opt/hermes` (source code, venv, node_modules). User data lives in separate directories.
+
+**Critical directories that MUST survive (all under /opt/data/):**
+1. `.hermes/` — config.yaml, .env, auth.json, memories/, cron/jobs.json, content/, logs/
+2. `config/` — GitHub SSH keys, PAT, X/Twitter accounts, OAuth tokens, xurl config
+3. `repos/` — agent-memories (private state), agent-skills (local mods)
+4. `scripts/` — custom scripts repo (git-tracked)
+5. `home/.local/bin/` — installed binaries (xurl, yt-dlp, etc.)
+6. `home/.npm-global/` — npm-installed tools
+7. `signal-cli*` — Signal CLI binary + archive
+
+**What gets replaced (do NOT back up):**
+- `/opt/hermes/` — the application itself, source code, venv, node_modules
+- `/opt/data/hermes-agent/venv` — rebuilt during upgrade
+
+**Backup methodology:**
+1. First, inventory: `find /opt/data -type f -not -path '*/.git/*' -not -path '*/__pycache__/*'` to see what exists
+2. Check symlinks: `ls -la ~` — note which `.hermes`, `.config`, `backlog`, `publications` are symlinks to `/opt/data/`
+3. Create tarball of all critical paths (use absolute paths from /opt/data)
+4. Create second tarball for cron output + installed binaries (they're large and may need separate handling)
+5. Write a README with restore instructions for future sessions
+
+**Important pitfalls:**
+- `.hermes/cron/output/` is often missed — contains months of cron job results (~1-2MB)
+- Installed binaries like xurl (13MB) live in `home/.local/bin/` and won't be in source repos
+- Cron output and binaries are too big to append to existing gzip tarballs (tar cannot update compressed archives)
+- After extract, permissions may be wrong — run `chown -R hermes:hermes` on extracted files
+
+See `references/pre-upgrade-backup.md` for the full methodology.
+
 ### Auxiliary models not working
 If `auxiliary` tasks (vision, compression, session_search) fail silently, the `auto` provider can't find a backend. Either set `OPENROUTER_API_KEY` or `GOOGLE_API_KEY`, or explicitly configure each auxiliary task's provider:
 ```bash
