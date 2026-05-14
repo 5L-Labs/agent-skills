@@ -563,6 +563,10 @@ Common gateway problems:
 ### Platform-specific issues
 - **Discord bot silent**: Must enable **Message Content Intent** in Bot → Privileged Gateway Intents.
 - **Slack bot only works in DMs**: Must subscribe to `message.channels` event. Without it, the bot ignores public channels.
+- **Discord `discord.py not installed`**: The gateway reports `WARNING: No adapter available for discord`. Two causes:
+  1. **Package missing from venv** — In Docker-installed Hermes the venv's `site-packages` is owned by root (set at build time). The runtime user can't write to it. Fix: `uv pip install discord.py --target /opt/data/discord-site-packages/` then add `PYTHONPATH=/opt/data/discord-site-packages` to `.env` and restart gateway.
+  2. **Package genuinely uninstalled** — check with `uv pip list | grep discord`.
+  Always enable **Message Content Intent** in Discord Bot settings → Privileged Gateway Intents, or the bot receives messages but cannot see their content.
 - **Windows HTTP 400 "No models provided"**: Config file encoding issue (BOM). Ensure `config.yaml` is saved as UTF-8 without BOM.
 - **Mattermost not responding**: Three things must all be configured:
   1. **Enable in config.yaml**: `platforms.mattermost.enabled: true` (env vars alone won't enable it)
