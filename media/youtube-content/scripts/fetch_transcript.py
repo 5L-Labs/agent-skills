@@ -59,18 +59,14 @@ def fetch_transcript(video_id: str, languages: list = None):
     """Fetch transcript segments from YouTube.
 
     Returns a list of dicts with 'text', 'start', and 'duration' keys.
-    Compatible with youtube-transcript-api v1.x.
-    """
+def fetch_transcript(video_id: str, languages: list = None):
+    """Fetch transcript segments from YouTube."""
+    from youtube_transcript_api import YouTubeTranscriptApi
+    # Prefer .fetch() interface (newer API); fall back to .get_transcript() if present
     try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-    except ImportError:
-        print("Error: youtube-transcript-api not installed. Run: pip install youtube-transcript-api",
-              file=sys.stderr)
-        sys.exit(1)
-
-    api = YouTubeTranscriptApi()
-    if languages:
-        result = api.fetch(video_id, languages=languages)
+        return YouTubeTranscriptApi().fetch(video_id, languages=languages or ["en"])
+    except AttributeError:
+        return YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
     else:
         result = api.fetch(video_id)
 

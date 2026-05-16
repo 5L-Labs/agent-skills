@@ -21,12 +21,22 @@ Download YouTube auto-generated or manual subtitles using yt-dlp. Use when you n
 
 ## Prerequisites
 
-yt-dlp must be installed. If not available:
+`yt-dlp` must be **installed and on `$PATH`**. If not available:
+
 ```bash
-uv tool install yt-dlp
-# Binary lands at ~/.local/bin/yt-dlp (may not be on PATH)
-# Use full path: /opt/data/home/.local/bin/yt-dlp
+# Try quick check first
+yt-dlp --version 2>/dev/null || echo "not found"
+
+# If absent, install via uv (no pip needed in main venv):
+uv venv /tmp/yt-venv && uv pip install --python /tmp/yt-venv/bin/python yt-dlp
+# Binary lands at /tmp/yt-venv/bin/yt-dlp
 ```
+
+**Verification:**
+```bash
+/tmp/yt-venv/bin/yt-dlp --version
+```
+
 
 ## Quick Start
 
