@@ -171,7 +171,7 @@ For local PDF processing, see the `ocr-and-documents` skill.
 
 Full list: https://arxiv.org/category_taxonomy
 
-## Helper Script
+### Helper Script
 
 The `scripts/search_arxiv.py` script handles XML parsing and provides clean output:
 
@@ -179,12 +179,29 @@ The `scripts/search_arxiv.py` script handles XML parsing and provides clean outp
 python scripts/search_arxiv.py "GRPO reinforcement learning"
 python scripts/search_arxiv.py "transformer attention" --max 10 --sort date
 python scripts/search_arxiv.py --author "Yann LeCun" --max 5
-python scripts/search_arxiv.py --category cs.AI --sort date
+python scripts/search_arxiv.py --category cs.AI --sort date --max 10
 python scripts/search_arxiv.py --id 2402.03300
 python scripts/search_arxiv.py --id 2402.03300,2401.12345
 ```
 
 No dependencies — uses only Python stdlib.
+
+### HTML Listings Fallback Script
+
+When the API is rate-limited or SSL errors occur, use `scripts/parse_listings.py`
+to extract metadata directly from a saved arXiv category listings HTML page:
+
+```bash
+# Step 1: save the HTML
+curl -s -A "Mozilla/5.0 (compatible; HermesBot/1.0)" "https://arxiv.org/list/cs.CL/new" -o /tmp/cscl_new.html
+
+# Step 2: parse and filter
+python scripts/parse_listings.py /tmp/cscl_new.html "large language model" --max 5
+```
+
+Outputs tab-separated lines: `arxiv_id<TAB>title<TAB>authors<TAB>abstract_snippet`.
+See **[references/html-listings-parsing.md](references/html-listings-parsing.md)** for
+the full HTML structure guide and known quirks.
 
 ---
 
@@ -243,6 +260,8 @@ curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=Yann+LeCun
 ## Complete Research Workflow
 
 1. **Discover**: `python scripts/search_arxiv.py "your topic" --sort date --max 10`
+   - If API is rate-limited: save the category listings HTML (`curl … -o /tmp/cscl_new.html`),
+     then run `python scripts/parse_listings.py /tmp/cscl_new.html "your topic" --max 10`
 2. **Assess impact**: `curl -s "https://api.semanticscholar.org/graph/v1/paper/arXiv:ID?fields=citationCount,influentialCitationCount"`
 3. **Read abstract**: `web_extract(urls=["https://arxiv.org/abs/ID"])`
 4. **Read full paper**: `web_extract(urls=["https://arxiv.org/pdf/ID"])`
@@ -252,14 +271,34 @@ curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=Yann+LeCun
 
 
 ### Troubleshooting API Rate Limits
-If the arXiv API returns "Rate exceeded", use a `sleep` interval (at least 3-5 seconds between requests) or include a user-agent string to improve compliance with access policies:
+
+If the arXiv API returns **HTTP 429** or you see `SSL: UNEXPECTED_EOF_WHILE_READING` errors (a known Python `urllib` issue on some environments), do not retry indefinitely in a loop. Use this two-level fallback:
+
+**Level 1 — API with sleep + User-Agent**
+
 ```bash
-curl -s -A "Mozilla/5.0" "https://export.arxiv.org/api/query?..."
+# Sleep 5–10 s between calls, always include a UA header
+curl -s -A "Mozilla/5.0 (compatible; HermesBot/1.0)" "https://export.arxiv.org/api/query?search_query=cat:cs.CL+AND+all:large+language+model&max_results=5"
 ```
-If programmatic access fails, fall back to scraping the recent listings page directly:
+
+**Level 2 — Category listings page (HTML)**
+
+If the API still fails, scrape the category-specific listings page. It is reliably accessible and contains full titles, authors, and first-paragraph abstracts for every recent submission.
+
 ```bash
-curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent"
+# Fetch the HTML listing (new submissions)
+curl -s -A "Mozilla/5.0 (compatible; HermesBot/1.0)" "https://arxiv.org/list/cs.CL/new" -o /tmp/cscl_new.html
+
+# Parse with the bundled script
+python3 scripts/parse_listings.py /tmp/cscl_new.html "large language model" --max 5
 ```
+
+Unlike the API, the listings page does not require pagination and is not subject to the same rate limits. Use it whenever:
+- The API returns HTTP 429
+- `urllib`/Python reports `SSLEOFError` or protocol errors
+- You need the most recent submissions regardless of API sort order
+
+For a detailed explanation of the HTML structure and regex patterns, see **[references/html-listings-parsing.md](references/html-listings-parsing.md)**.
 
 
 | API | Rate | Auth |

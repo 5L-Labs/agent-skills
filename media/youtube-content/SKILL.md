@@ -57,6 +57,21 @@ python3 SKILL_DIR/scripts/generate_luna_digest.py "timestamped_transcript.txt"`
 ```
 
 > **Note**: The provided `generate_luna_digest.py` script may not work reliably with all transcript formats or may produce no output. In automated workflows, be prepared to immediately use the fallback method if the script fails or produces no output.
+
+### Batch Scripts (cron / playlist mode)
+
+Use these when the Python `youtube-transcript-api` call is blocked (SSL error from cloud IP). See `references/batch-scripts.md` and `references/cloud-ip-blocking.md` for selection guidance.
+
+| Script | Use when |
+|--------|----------|
+| `_fetch_transcripts_batch.py` | Python urllib available, strict VTT parse needed |
+| `yt_batch_10.sh` | shell needed, video count hardcoded |
+
+Canonical storage paths for this deployment:
+- Playlist: `/opt/data/content/playlist-new-ids.txt`
+- Backlog: `/opt/data/content/yt-backlog.json`
+- Raw dir: `/opt/data/content/youtube-raw/`
+- Batch scripts (on-disk): `/opt/data/content/scripts/ `, check with `find /opt/data/content -name "_fetch_transcripts_batch.py" -type f`
 \n\n> **Fallback method**: When the standard script fails or produces no output:\n> 1. Strip timestamps from transcript lines (remove patterns like `0:05 `, `12:34 `, or `1:05:23 ` using regex `^\\d+:\\d{2}(?:\\:\\d{2})?\\s+`)\n> 2. Join remaining text and split into sentences\n> 3. Filter to keep only meaningful sentences (length > 20 characters)\n> 4. Group sentences into thematic sections (prospects/benefits, key applications, challenges/risks, philosophical considerations)\n> 5. Format as Luna-style bullet points with `•` for main points and `◦` for sub-points\n> 6. Bold key terms on first mention\n> 7. This ensures batch processing can continue even when the standard script fails.
 
 ## Output Formats
@@ -130,8 +145,29 @@ Style rules:
    - If the script produces no output or encounters an error, immediately use the fallback method: strip timestamps, join text, split into meaningful sentences (length > 20 chars), and create a structured digest with thematic sections following the Luna format guidelines
    - For other formats: follow the specific formatting guidelines in the Output Formats section
 6. **Verify**: re-read the transformed output to check for coherence, correct timestamps, and completeness before presenting.
-7. **Save** raw transcript to `/opt/data/.hermes/content/youtube-raw/<name>.txt`
+7. **Save** raw transcript to `/opt/data/.hermes/content/youtube-raw/<name>.txt`.
 8. **Update backlog**: after successful processing, remove the video ID from the backlog JSON (`/opt/data/.hermes/content/yt-backlog.json` -> `unique_videos` array).
+
+### Batch / cron job (playlist-driven)
+
+Run only when `/opt/data/content/playlist-new-ids.txt` contains entries that do NOT already end in `DONE`.
+
+```
+Checked through playlist in /opt/data/content/playlist-new-ids.txt first.
+```
+
+**Re-scan preconditions** (before any network call):
+1. Read `/opt/data/content/playlist-new-ids.txt` — skip lines ending `DONE`; those are already processed.
+2. Read `/opt/data/content/yt-backlog.json` → `unique_videos` array + `failed_videos`.
+3. **If playlist is fully exhausted** (every entry ends in `DONE`) → report zeros, skip network.
+4. Pre-scan: for each candidate, if the 3-file set (`{VIDEO_ID}_transcript.txt`, `_fulltext.txt`, `_meta.json`) already exists in `/opt/data/content/youtube-raw/` and `meta.note` is NOT `chapter_outline_ip_blocked` → skip as DONE. If the note IS `chapter_outline_ip_blocked`, report honestly but skip re-fetch (add note — OCR-blocked videos rarely succeed on retry anyway).
+5. Detector: orphan 3-file sets (on-disk files exist but `unique_videos` has no entry) → silently add to `unique_videos`, skip network call.
+6. **Pick next N** (default 10) unprocessed and write to `VIDEOS` array in `_fetch_transcripts_batch.py`.
+7. Run `_fetch_transcripts_batch.py` selected video set (circuit-break at 3 seconds, parallel-limit 10).
+8. For each processed video: write `{VIDEO_ID}_transcript.txt`, `{VIDEO_ID}_fulltext.txt`, `{VIDEO_ID}_meta.json` to `/opt/data/content/youtube-raw/`. `meta.json` must contain: `video_id`, `title`, `segment_count`, `duration`, `fetched_at`, and optional `note`.
+9. Append `VIDEO_ID` to `/opt/data/content/yt-backlog.json` → `unique_videos`.
+10. Append ` DONE` to the matching line in `playlist-new-ids.txt`.
+11. Write `last_batch_report.json` with target IDs, success/failure breakdown, and reason for each failure.
 
 ## Environment Setup
 
@@ -175,11 +211,10 @@ Use `find /opt/data -name "fetch_transcript.py" -type f` if needed.
   text = ' '.join([line.split(' ', 1)[-1] for line in lines if line.strip()])
   digest = f"• Core concept: {text[:100]}...\n• Key points extracted from transcript.\n"
   ```
-- **Cloud IP blocking**: YouTube blocks transcript requests from cloud provider IPs (AWS, GCP, Azure). The script returns a JSON error: `{"error": "Could not retrieve a transcript..."}`. Workarounds:
-  - **Always check the local cache at `/opt/data/home/.hermes/content/youtube-raw/<video_id>.txt`** first, as this often contains pre-fetched transcripts that bypass the block.
-  - Use a residential proxy or VPN
-  - Use cookies from a logged-in YouTube session (`--cookies` flag if supported)
-  - Pre-fetch transcripts from a non-cloud machine and store them locally
+- **Cloud IP blocking**: YouTube blocks transcript requests from cloud provider IPs (AWS, GCP, Azure). The `youtube_transcript_api` call, `yt-dlp` query, and even direct `urllib` HTML fetch all fail identically with `SSL: UNEXPECTED_EOF_WHILE_READING` — this is an IP-range block, not a library bug. On `OPT_DATA_PATTERN` this machine, **no Python or urllib-based retry can succeed while the block lasts**. Preferred workarounds, in order: (1) run from a non-cloud machine, (2) run on a stable network. See `references/cloud-ip-blocking.md` for the full failure taxonomy and per-layer behaviour.
+  - **Always check the local cache at `/opt/data/content/youtube-raw/<video_id>.txt`** first, as this contains pre-fetched transcripts fetched before the block or from a different network path.
+  - **Chapter fallback**: when both transcript fetch and VTT attempt fail, extract chapter titles + timestamps from `yt-dlp` metadata (if available) and save with `note: "chapter_outline_ip_blocked"`. Future runs should skip re-fetch for any 3-file set with this note but present it honestly.
+  - **Confirmed-permanent vs transient-block**: in `yt-backlog.json` record verbatim error text. Use `"status": "confirmed_permanent"` for disabled-subs / IP blacklist; use `"status": "transient_block"` for transient timeouts and empty-yt-dlp responses. Update `last_updated` every cron run.
 
 ## Pitfalls
 
