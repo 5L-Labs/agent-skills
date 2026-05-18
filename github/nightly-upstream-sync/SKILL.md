@@ -84,12 +84,24 @@ for root, dirs, files in os.walk(local_path):
 ### Nightly flow
 
 1. `git fetch --depth 1 origin main` on upstream clone
-2. `git fetch origin main` + `git pull` on local repo
-3. Compare files against upstream map
-4. If changes: create branch `update/YYYY-MM-DD`, stage only custom files, commit, push
-5. Open PR via GitHub API
-6. Auto-merge workflow handles the rest (see `github-auto-merge-workflow` skill)
-7. Deliver diff report to user in chat
+2. Compare files against upstream map, classify into two groups:
+   - **new_files** (files that don't exist upstream -- our custom additions)
+   - **modified_files** (files that exist in both but differ -- upstream changes to sync)
+3. **Split into two PRs:**
+   - **Upstream sync** (`update/upstream-YYYY-MM-DD`): only modified_files. Auto-merges on green. Title: `Upstream sync {date}`
+   - **Local customizations** (`update/local-YYYY-MM-DD`): only new_files. Needs human review. Title: `Local customizations {date}`
+4. Each branch: stage files, commit, push with --force, open PR via GitHub API
+5. Auto-merge workflow handles upstream PRs automatically (skips local PRs -- see `github-auto-merge-workflow` skill)
+6. Deliver summary to user in chat
+
+### Why split?
+
+| Before (one PR) | After (two PRs) |
+|-----------------|-----------------|
+| One giant PR mixing upstream changes with new custom skills | Clean separation |
+| 60+ one-line description changes drown out the 3 new skills | Upstream PR merges silently |
+| Reviewer has to sift through noise to find the signal | Local PR shows only what needs review |
+| Auto-merge on everything or nothing | Upstream auto-merges, local waits |
 
 ### Cron job
 
@@ -100,12 +112,14 @@ Deliver: origin (to current chat)
 
 ## Pitfalls
 
-- **Don't use `git remote add upstream`** in the same repo — separate clone is safer
-- **Don't delete upstream files** from your repo to "clean up" — just let the nightly script skip them
-- **`os.path.reljoin` doesn't exist** — use `os.path.relpath`
-- **`git rm -rf .` on 400+ files can timeout** — avoid bulk operations, use targeted `git add` for custom files only
-- **`git add` fails on gitignored files** — always check with `git check-ignore -q` first
-- **Branch protection needs GitHub Pro for private repos** — use `workflow_run` auto-merge instead
+- **Stale merge base**: A nightly PR branched from an older `main` will show changes already present in current `main` (e.g. description-line edits from a prior nightly sync). Git resolves them cleanly (same content on both sides), but the diff is noisy. Fix: rebase branch onto latest `main` before pushing, or just note it in the PR body.
+- **Don't use `git remote add upstream`** in the same repo -- separate clone is safer
+- **Don't delete upstream files** from your repo to "clean up" -- just let the nightly script skip them
+- **`os.path.reljoin` doesn't exist** -- use `os.path.relpath`
+- **`git rm -rf .` on 400+ files can timeout** -- avoid bulk operations, use targeted `git add` for custom files only
+- **`git add` fails on gitignored files** -- always check with `git check-ignore -q` first
+- **Branch protection needs GitHub Pro for private repos** -- use `workflow_run` auto-merge instead
+- **Selective auto-merge**: The auto-merge workflow needs a branch-name guard to skip local-only PRs. See the `github-auto-merge-workflow` skill for implementation.
 
 ## Script Location
 

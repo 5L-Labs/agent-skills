@@ -87,3 +87,44 @@ jobs:
 - Nightly commit/PR workflows (skill-versioning, memory exports)
 - Bot-driven PRs that should auto-merge on green
 - Any private repo workflow needing "merge on green" without Pro
+
+## Selective Auto-Merge (Skip by Branch Name)
+
+When different types of PRs come from the same repo (e.g. upstream syncs vs local customizations), you can selectively auto-merge only the ones that don't need human review.
+
+The `workflow_run` event provides both `head_sha` and `head_branch`:
+
+```yaml
+- name: Merge PR on green
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+
+    # Skip PRs that need human review
+    if [[ "$HEAD_BRANCH" == update/local-* ]]; then
+      echo "Local customization PR — skipping auto-merge (needs review)"
+      exit 0
+    fi
+
+    PR_NUMBER=$(gh pr list --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number // empty')
+    if [ -z "$PR_NUMBER" ]; then exit 0; fi
+    gh pr merge "$PR_NUMBER" --squash --delete-branch
+```
+
+This works because:
+- **`head_branch`** is the branch name of the head commit that triggered the workflow run — this is what `gh pr list --head` uses to find the PR
+- **`head_sha`** is the commit SHA — use this if you need commit-level specificity
+- The guard runs before any API calls, so branch-name filtering is fast and zero-cost
+
+### When to Skip Auto-Merge
+
+- **PRs with custom/user-created content** — new skills, config files, templates that the author should review before they land in main
+- **PRs from rename-only or metadata-only changes** — description edits, curator normalization, formatting-only commits
+- **PRs with manual intervention expected** — draft PRs, WIP branches, experimental changes
+
+### When NOT to Skip
+
+- **Upstream syncs** — these should always auto-merge on green (they're verbatim copies of upstream, already reviewed there)
+- **Auto-generated commits** — version bumps, dependency updates, nightly report exports
+- **Memory/session exports** — data dumps that don't need human review
