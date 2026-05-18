@@ -4,6 +4,7 @@ description: "Review PRs: diffs, inline comments via gh or REST."
 version: 1.1.0
 author: Hermes Agent
 license: MIT
+platforms: [linux, macos, windows]
 metadata:
   hermes:
     tags: [GitHub, Code-Review, Pull-Requests, Git, Quality]
@@ -19,24 +20,44 @@ Perform code reviews on local changes before pushing, or review open PRs on GitH
 - Authenticated with GitHub (see `github-auth` skill)
 - Inside a git repository
 
+### gh CLI availability
+
+Prefer the official `gh` CLI over raw curl API calls. If `gh` isn't installed, install it on the fly:
+
+```bash
+# Install gh on-demand (no root needed)
+if ! command -v gh &>/dev/null; then
+  curl -sL "https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_amd64.tar.gz" -o /tmp/gh.tar.gz
+  tar xzf /tmp/gh.tar.gz -C /tmp/
+  alias gh=/tmp/gh_2.67.0_linux_amd64/bin/gh
+fi
+```
+
+Use `GH_TOKEN` env var to authenticate (avoids `gh auth login` scope requirements like `read:org`):
+
+```bash
+export GH_TOKEN="$GITHUB_TOKEN"
+```
+
 ### Setup (for PR interactions)
 
 ```bash
-if command -v gh &>/dev/null && gh auth status &>/dev/null; then
+if command -v gh &>/dev/null && GH_TOKEN="$GITHUB_TOKEN" gh auth status &>/dev/null; then
   AUTH="gh"
 else
   AUTH="git"
   if [ -z "$GITHUB_TOKEN" ]; then
     if [ -f ~/.hermes/.env ] && grep -q "^GITHUB_TOKEN=" ~/.hermes/.env; then
-      GITHUB_TOKEN=$(grep "^GITHUB_TOKEN=" ~/.hermes/.env | head -1 | cut -d= -f2 | tr -d '\n\r')
+      GITHUB_TOKEN=$(grep "^GITHUB_TOKEN=" ~/.hermes/.env | head -1 | cut -d= -f2 | tr -d '\\n\\r')
     elif grep -q "github.com" ~/.git-credentials 2>/dev/null; then
-      GITHUB_TOKEN=$(grep "github.com" ~/.git-credentials 2>/dev/null | head -1 | sed 's|https://[^:]*:\([^@]*\)@.*|\1|')
+      GITHUB_TOKEN=$(grep "github.com" ~/.git-credentials 2>/dev/null | head -1 | sed 's|https://[^:]*:\\([^@]*\\)@.*|\\1|')
     fi
   fi
+  export GH_TOKEN="$GITHUB_TOKEN"
 fi
 
 REMOTE_URL=$(git remote get-url origin)
-OWNER_REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]||; s|\.git$||')
+OWNER_REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\\.com[:/]||; s|\\.git$||')
 OWNER=$(echo "$OWNER_REPO" | cut -d/ -f1)
 REPO=$(echo "$OWNER_REPO" | cut -d/ -f2)
 ```
@@ -338,7 +359,37 @@ source "${HERMES_HOME:-$HOME/.hermes}/skills/github/github-auth/scripts/gh-env.s
 # Or run the inline setup block from the top of this skill
 ```
 
-### Step 2: Gather PR context
+### Step 2: Check what type of PR this is
+
+Before diving into the diff, check the branch name to understand the PR's nature:
+
+```bash
+BRANCH=$(gh pr view $PR_NUMBER --json headRefName --jq '.headRefName')
+```
+
+Branch naming conventions signal intent:
+- `update/upstream-*` -- upstream sync PR. Changes are verbatim from upstream. Review for merge conflicts only -- substantive review already happened upstream.
+- `update/local-*` -- local customization PR. New files or custom edits that need full review. These are NOT auto-merged.
+- `update/YYYY-MM-DD` or other patterns -- may be mixed. Check the diff stat to understand scope.
+
+For upstream-sync PRs, check if changes are redundant (already in main via earlier PRs):
+
+```bash
+git fetch origin
+MERGE_BASE=$(git merge-base origin/main origin/$BRANCH)
+
+# Files changed in the PR  
+git diff $MERGE_BASE...origin/$BRANCH --name-only | sort > /tmp/changed-in-pr.txt
+# Files changed in main since the fork point
+git diff $MERGE_BASE...origin/main --name-only | sort > /tmp/changed-in-main.txt
+
+# Files changed in both -- likely redundant
+comm -12 /tmp/changed-in-main.txt /tmp/changed-in-pr.txt
+```
+
+Files that appear in both diffs with identical content are noise -- the auto-merge handles them seamlessly. Focus on files that are genuinely new.
+
+### Step 3: Gather PR context
 
 Get the PR metadata, description, and list of changed files to understand scope before diving into code.
 
@@ -362,7 +413,7 @@ curl -s -H "Authorization: token $GITHUB_TOKEN" \
   https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER/files
 ```
 
-### Step 3: Check out the PR locally
+### Step 4: Check out the PR locally
 
 This gives you full access to `read_file`, `search_files`, and the ability to run tests.
 
@@ -371,7 +422,7 @@ git fetch origin pull/$PR_NUMBER/head:pr-$PR_NUMBER
 git checkout pr-$PR_NUMBER
 ```
 
-### Step 4: Read the diff and understand changes
+### Step 5: Read the diff and understand changes
 
 ```bash
 # Full diff against the base branch
@@ -385,7 +436,7 @@ git diff main...HEAD -- path/to/file.py
 
 For each changed file, use `read_file` to see full context around the changes — diffs alone can miss issues visible only with surrounding code.
 
-### Step 5: Run automated checks locally (if applicable)
+### Step 6: Run automated checks locally (if applicable)
 
 ```bash
 # Run tests if there's a test suite
@@ -397,11 +448,11 @@ ruff check . 2>&1 | head -30
 # or: eslint, clippy, etc.
 ```
 
-### Step 6: Apply the review checklist (Section 3)
+### Step 7: Apply the review checklist (Section 3)
 
 Go through each category: Correctness, Security, Code Quality, Testing, Performance, Documentation.
 
-### Step 7: Post the review to GitHub
+### Step 8: Post the review to GitHub
 
 Collect your findings and submit them as a formal review with inline comments.
 
@@ -427,7 +478,7 @@ curl -s -X POST \
   -d "{
     \"commit_id\": \"$HEAD_SHA\",
     \"event\": \"REQUEST_CHANGES\",
-    \"body\": \"## Hermes Agent Review\n\nFound 2 issues, 1 suggestion. See inline comments.\",
+    \"body\": \"## Hermes Agent Review\\n\\nFound 2 issues, 1 suggestion. See inline comments.\",
     \"comments\": [
       {\"path\": \"src/auth.py\", \"line\": 45, \"body\": \"🔴 **Critical:** User input passed directly to SQL query — use parameterized queries.\"},
       {\"path\": \"src/models.py\", \"line\": 23, \"body\": \"⚠️ **Warning:** Password stored without hashing.\"},
@@ -436,7 +487,7 @@ curl -s -X POST \
   }"
 ```
 
-### Step 8: Also post a summary comment
+### Step 9: Also post a summary comment
 
 In addition to inline comments, leave a top-level summary so the PR author gets the full picture at a glance. Use the review output format from `references/review-output-template.md`.
 
@@ -466,7 +517,7 @@ EOF
 )"
 ```
 
-### Step 9: Clean up
+### Step 10: Clean up
 
 ```bash
 git checkout main
