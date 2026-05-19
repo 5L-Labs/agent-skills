@@ -1,0 +1,54 @@
+{
+  "hn-brief-digest": {
+    "archived_at": null,
+    "created_at": "2026-05-18T06:02:52.287253+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-05-18T06:03:29.409596+00:00",
+    "last_used_at": "2026-05-18T22:00:26.133659+00:00",
+    "last_viewed_at": "2026-05-18T06:04:00.440271+00:00",
+    "patch_count": 2,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 1
+  },
+  "mcporter": {
+    "archived_at": null,
+    "created_at": "2026-05-18T06:00:59.313200+00:00",
+    "created_by": null,
+    "last_patched_at": null,
+    "last_used_at": "2026-05-18T06:00:59.328814+00:00",
+    "last_viewed_at": "2026-05-18T06:00:59.313221+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 1,
+    "view_count": 1
+  },
+  "unified-digest-themes": {
+    "archived_at": null,
+    "created_at": "2026-05-18T06:02:19.855390+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-05-18T06:11:57.372726+00:00",
+    "last_used_at": "2026-05-18T22:00:26.148384+00:00",
+    "last_viewed_at": "2026-05-18T09:01:21.798393+00:00",
+    "patch_count": 3,
+    "pinned": false,
+    "state": "active",
+    "use_count": 6,
+    "view_count": 4
+  },
+  "x-digest": {
+    "archived_at": null,
+    "created_at": "2026-05-18T06:01:09.777339+00:00",
+    "created_by": null,
+    "last_patched_at": "2026-05-18T06:11:37.197193+00:00",
+    "last_used_at": "2026-05-18T09:00:49.325466+00:00",
+    "last_viewed_at": "2026-05-18T06:56:10.367386+00:00",
+    "patch_count": 13,
+    "pinned": false,
+    "state": "active",
+    "use_count": 8,
+    "view_count": 7
+  }
+}
