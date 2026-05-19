@@ -552,13 +552,17 @@ terminal(command="tmux new-session -d -s resumed 'hermes --resume 20260225_14305
 ### Gateway issues
 Check logs first:
 ```bash
-grep -i "failed to send\|error" ~/.hermes/logs/gateway.log | tail -20
+grep -i "failed to send\\|error" ~/.hermes/logs/gateway.log | tail -20
 ```
 
 Common gateway problems:
 - **Gateway dies on SSH logout**: Enable linger: `sudo loginctl enable-linger $USER`
 - **Gateway dies on WSL2 close**: WSL2 requires `systemd=true` in `/etc/wsl.conf` for systemd services to work. Without it, gateway falls back to `nohup` (dies when session closes).
 - **Gateway crash loop**: Reset the failed state: `systemctl --user reset-failed hermes-gateway`
+
+### Headless OAuth
+
+When setting up OAuth providers (xAI/SuperGrok, Nous Portal, xAPI) on a **headless server** with no browser, the callback URL points to `localhost` on the server and never reaches the server from your local machine. See [references/headless-oauth.md](references/headless-oauth.md) for the SSH tunnel pattern and manual redirect URL extraction fallback.
 
 ### Platform-specific issues
 - **Discord bot silent**: Must enable **Message Content Intent** in Bot → Privileged Gateway Intents.
