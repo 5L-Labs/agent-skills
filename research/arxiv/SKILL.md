@@ -20,6 +20,7 @@ Search and retrieve academic papers from arXiv via their free REST API. No API k
 |--------|---------|
 | Search papers | `curl "https://export.arxiv.org/api/query?search_query=all:QUERY&max_results=5"` |
 | Get specific paper | `curl "https://export.arxiv.org/api/query?id_list=2402.03300"` |
+| Read abstract (web) **fallback** | `web_extract(urls=["https://ar5iv.org/html/2402.03300v1"])` |
 | Read abstract (web) | `web_extract(urls=["https://arxiv.org/abs/2402.03300"])` |
 | Read full paper (PDF) | `web_extract(urls=["https://arxiv.org/pdf/2402.03300"])` |
 
@@ -144,7 +145,7 @@ print('}')
 
 ## Reading Paper Content
 
-After finding a paper, read it:
+After finding a paper, `web_extract` is the most reliable way to read it — not `curl | pipe`, which is blocked by the security scanner.
 
 ```
 # Abstract page (fast, metadata + abstract)
@@ -154,7 +155,19 @@ web_extract(urls=["https://arxiv.org/abs/2402.03300"])
 web_extract(urls=["https://arxiv.org/pdf/2402.03300"])
 ```
 
+**When arxiv.org is unreachable (TLS/SSL errors)**, use `ar5iv.org` instead:
+```
+web_extract(urls=["https://ar5iv.org/html/2402.03300v1"])
+```
+ar5iv renders the same content as clean HTML — title, authors, abstract, sections — and is served over a different CDN that is often accessible when `export.arxiv.org` and `arxiv.org` are not.
+
 For local PDF processing, see the `ocr-and-documents` skill.
+
+**When the search API is unreachable**, use `web_search` with `site:arxiv.org` scoped to category + date, then `web_extract` on `ar5iv.org` for individual abstracts:
+```
+web_search(query="site:arxiv.org cs.CL large language model 2026")
+web_extract(urls=["https://ar5iv.org/html/{id}v1"])
+```
 
 ## Common Categories
 
@@ -243,22 +256,41 @@ curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=Yann+LeCun
 ## Complete Research Workflow
 
 1. **Discover**: `python scripts/search_arxiv.py "your topic" --sort date --max 10`
+   - If the API is unreachable, use `web_search(query="site:arxiv.org cs.CL your topic YYYY")` instead
 2. **Assess impact**: `curl -s "https://api.semanticscholar.org/graph/v1/paper/arXiv:ID?fields=citationCount,influentialCitationCount"`
-3. **Read abstract**: `web_extract(urls=["https://arxiv.org/abs/ID"])`
-4. **Read full paper**: `web_extract(urls=["https://arxiv.org/pdf/ID"])`
-5. **Find related work**: `curl -s "https://api.semanticscholar.org/graph/v1/paper/arXiv:ID/references?fields=title,citationCount&limit=20"`
+3. **Read abstract**: `web_extract(urls=["https://ar5iv.org/html/{id}v1"])`
+   - Prefer ar5iv over arxiv.org/abs when programmatic access is blocked
+4. **Read full paper**: `web_extract(urls=["https://arxiv.org/pdf/{id}"])`
+5. **Find related work**: Semantic Scholar references endpoint
 6. **Get recommendations**: POST to Semantic Scholar recommendations endpoint
-7. **Track authors**: `curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=NAME"`
+7. **Track authors**: Semantic Scholar author search
 
 
-### Troubleshooting API Rate Limits
-If the arXiv API returns "Rate exceeded", use a `sleep` interval (at least 3-5 seconds between requests) or include a user-agent string to improve compliance with access policies:
+### Troubleshooting API Issues
+
+**TLS / SSL errors with export.arxiv.org**
+In some environments, direct HTTPS connections to `export.arxiv.org` fail with `SSL: UNEXPECTED_EOF_WHILE_READING` or similar. This is a network/environment issue, not an arXiv problem.
+
+**Workaround: use ar5iv.org HTML rendering + web_search**
+`ar5iv.org` renders arXiv papers as clean HTML and is often reachable when the API is not. Use this two-step pattern:
+
+```bash
+# Step 1: Find paper IDs with web_search (no special args needed)
+# Step 2: Fetch abstracts via ar5iv
+web_extract(urls=["https://ar5iv.org/html/2505.06120v1"])
+```
+
+ar5iv URLs follow this pattern:
+- Abstract/HTML: `https://ar5iv.org/html/{arxiv_id}v{N}` (omit `v{N}` for latest)
+- PDF stays the same: `https://arxiv.org/pdf/{arxiv_id}`
+
+**Fallback for programmatic PDF access**
+If both the API and ar5iv HTML are blocked, fall back to `web_search` with `site:arxiv.org` queries scoped to the desired category and date range, then retrieve individual abstracts with `web_extract` on the `arxiv.org/abs/` page.
+
+**Rate Limits**
+If the arXiv API returns "Rate exceeded", use a `sleep` interval (at least 3-5 seconds between requests) or include a user-agent string:
 ```bash
 curl -s -A "Mozilla/5.0" "https://export.arxiv.org/api/query?..."
-```
-If programmatic access fails, fall back to scraping the recent listings page directly:
-```bash
-curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent"
 ```
 
 
@@ -273,8 +305,9 @@ curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent"
 - Semantic Scholar returns JSON — pipe through `python3 -m json.tool` for readability
 - arXiv IDs: old format (`hep-th/0601001`) vs new (`2402.03300`)
 - PDF: `https://arxiv.org/pdf/{id}` — Abstract: `https://arxiv.org/abs/{id}`
-- HTML (when available): `https://arxiv.org/html/{id}`
+- ar5iv HTML: `https://ar5iv.org/html/{id}v{N}` — prefer this over `arxiv.org/abs` when programmatic access fails
 - For local PDF processing, see the `ocr-and-documents` skill
+- **Environment constraint**: In this deployment `export.arxiv.org` may fail with a TLS error; see `references/environment-notes.md` for the confirmed workaround
 
 ## ID Versioning
 
