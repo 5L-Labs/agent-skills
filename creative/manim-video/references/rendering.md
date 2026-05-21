@@ -45,6 +45,53 @@ EOF
 ffmpeg -y -f concat -safe 0 -i concat.txt -c copy final.mp4
 ```
 
+### Auto-Generated concat.txt via Render Script
+
+For projects with many scenes, encode the scene list directly in the render script so `concat.txt` is always up to date when scenes are added/removed:
+
+```bash
+# In render.sh
+cat > concat.txt << 'EOF'
+file 'media/videos/script/480p15/Scene1_KVCacheProblem.mp4'
+file 'media/videos/script/480p15/Scene2_AttentionBasics.mp4'
+file 'media/videos/script/480p15/Scene3_RoPERotation.mp4'
+file 'media/videos/script/480p15/Scene4_PreRoPEConcentration.mp4'
+file 'media/videos/script/480p15/Scene5_TrigonometricScoring.mp4'
+file 'media/videos/script/480p15/Scene6_TriAttentionCompression.mp4'
+EOF
+
+ffmpeg -y -f concat -safe 0 -i concat.txt -c copy final.mp4
+```
+
+This eliminates the manual step of building `concat.txt` whenever the scene list changes. A full `render.sh` template is available at `templates/render.sh`.
+
+### Render Script (Full Template)
+
+`templates/render.sh` — enabled draft-medium-production loop with logging:
+
+```bash
+#!/usr/bin/env bash
+# render.sh — Draft → stitch → hint at production rerun
+set -e
+cd "$(dirname "$0")"
+echo "=== Rendering [Project Name] ==="
+echo ""
+echo "[1/3] Scene 1: scene_name..."; manim -ql script.py Scene1_SceneName
+echo "[2/3] Scene 2: scene_name..."; manim -ql script.py Scene2_SceneName
+echo "[3/3] Stitching..."; [generate concat.txt as above]
+echo ""
+echo "=== Done! Output: final.mp4 ==="
+echo "For production: rerun each manim line with -qh instead of -ql"
+```
+
+Key conventions in the template:
+- `set -e` — exit immediately if any scene fails
+- `cd "$(dirname "$0")"` — always run from script directory so paths resolve correctly
+- `-ql` (draft) in the run loop; prompt to switch to `-qh` for a production rerun
+- Numbered echo lines make the terminal output a clear progress tracker
+- `concat.txt` hardcoded inside script keeps it in sync with the scene list
+```
+
 ## Add Voiceover
 
 ```bash

@@ -1,7 +1,7 @@
 ---
 name: arxiv
 description: "Search arXiv papers by keyword, author, category, or ID."
-version: 1.0.0
+version: 1.0.1
 author: Hermes Agent
 license: MIT
 metadata:
@@ -12,16 +12,29 @@ metadata:
 
 # arXiv Research
 
-Search and retrieve academic papers from arXiv via their free REST API. No API key, no dependencies — just curl.
+Search and retrieve academic papers from arXiv via their free REST API or by scraping listing pages.
+
+## ⚠️ Known Environment Issues
+
+| Problem | Symptom | Workaround |
+|---------|---------|------------|
+| TLS failure to `export.arxiv.org` | `UNEXPECTED_EOF_WHILE_READING` from curl/python urllib | Use `web_search` + `web_extract` on `arxiv.org/abs/ID` pages |
+| Script path | Skill docs say `python scripts/search_arxiv.py` | Call with full path: `python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py` |
+| Script itself uses `urllib` | Hits same TLS failure as direct API calls | Treat script as reference/parser; primary access via web tools |
+| `wget`, `ping` not installed | Commands not found | Use `curl` or `urllib` only |
+
+**When the API is unreachable**, see the **Web-Scraping Fallback** section below.
 
 ## Quick Reference
 
 | Action | Command |
 |--------|---------|
-| Search papers | `curl "https://export.arxiv.org/api/query?search_query=all:QUERY&max_results=5"` |
-| Get specific paper | `curl "https://export.arxiv.org/api/query?id_list=2402.03300"` |
-| Read abstract (web) | `web_extract(urls=["https://arxiv.org/abs/2402.03300"])` |
-| Read full paper (PDF) | `web_extract(urls=["https://arxiv.org/pdf/2402.03300"])` |
+| Search papers (API) | `curl "https://export.arxiv.org/api/query?search_query=all:QUERY&max_results=5"` |
+| Get specific paper (API) | `curl "https://export.arxiv.org/api/query?id_list=2402.03300"` |
+| Get specific paper (script) | `python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py --id 2402.03300` |
+| Search by category (script) | `python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py --category cs.CL --max 10 --sort date` |
+| Read abstract (web — works even when API is down) | `web_extract(urls=["https://arxiv.org/abs/2402.03300"])` |
+| Read full paper (PDF → markdown) | `web_extract(urls=["https://arxiv.org/pdf/2402.03300"])` |
 
 ## Searching Papers
 
@@ -173,18 +186,18 @@ Full list: https://arxiv.org/category_taxonomy
 
 ## Helper Script
 
-The `scripts/search_arxiv.py` script handles XML parsing and provides clean output:
+The `scripts/search_arxiv.py` script handles XML parsing and provides clean output. **Use the full path** — the script lives inside the skill directory:
 
 ```bash
-python scripts/search_arxiv.py "GRPO reinforcement learning"
-python scripts/search_arxiv.py "transformer attention" --max 10 --sort date
-python scripts/search_arxiv.py --author "Yann LeCun" --max 5
-python scripts/search_arxiv.py --category cs.AI --sort date
-python scripts/search_arxiv.py --id 2402.03300
-python scripts/search_arxiv.py --id 2402.03300,2401.12345
+python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py "GRPO reinforcement learning"
+python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py "transformer attention" --max 10 --sort date
+python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py --author "Yann LeCun" --max 5
+python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py --category cs.AI --sort date --max 10
+python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py --id 2402.03300
+python3 /opt/hermes/skills/research/arxiv/scripts/search_arxiv.py --id 2402.03300,2401.12345
 ```
 
-No dependencies — uses only Python stdlib.
+No dependencies except Python stdlib. ⚠️ The script calls `urllib.request.urlopen` directly — it will fail with TLS errors in environments where `export.arxiv.org` is blocked. See **Known Environment Issues** above.
 
 ---
 
@@ -256,10 +269,48 @@ If the arXiv API returns "Rate exceeded", use a `sleep` interval (at least 3-5 s
 ```bash
 curl -s -A "Mozilla/5.0" "https://export.arxiv.org/api/query?..."
 ```
-If programmatic access fails, fall back to scraping the recent listings page directly:
-```bash
-curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent"
+
+### TLS / Complete API Failure
+If `export.arxiv.org` is unreachable with `UNEXPECTED_EOF_WHILE_READING`, the API and `urllib`-based tools are blocked at the TLS layer. Use the web-scraping workflow below instead — `web_search` + `web_extract` bypass TLS restrictions because the web tool routes through a proxy.
+
+## Web-Scraping Fallback (API Down)
+
+When `export.arxiv.org` or `urllib` calls fail, use this pattern:
+
+```python
+# Step 1: Find candidate papers with web_search
+web_search(query="large language model site:arxiv.org/abs cs.CL", limit=10)
+# Returns: list of {url, title, description}
+
+# Step 2: Get full abstracts with web_extract
+web_extract(urls=[
+    "https://arxiv.org/abs/2605.20170",
+    "https://arxiv.org/abs/2605.20179",
+])
+# Returns: {title, content} per URL — content includes abstract text
+
+# Step 3: For bulk listing discovery, scrape the category listing pages
+web_extract(urls=["https://arxiv.org/list/cs.CL/recent?skip=0&show=100"])
+# Lists recent papers with IDs, titles, and authors (no full abstracts)
 ```
+
+### arXiv Listing Pages for Bulk Discovery
+
+| URL | What it shows |
+|-----|--------------|
+| `https://arxiv.org/list/cs.CL/new` | Papers submitted today (split by section: new / cross-lists / replacements) |
+| `https://arxiv.org/list/cs.CL/recent` | Last few days of submissions, paginated |
+| `https://arxiv.org/list/cs.CL/current` | All papers in the current month, paginated |
+| `https://arxiv.org/list/cs.CL/2026-05` | All papers in a specific month |
+
+Use `?skip=N&show=100` to paginate (0-based `skip`, up to 2000 entries). The listing page shows titles/authors/categories but not full abstracts — extract paper IDs from `arXiv:NNNN.NNNNN` links, then call `web_extract` on each `https://arxiv.org/abs/ID` for the full abstract.
+
+### Finding Papers by Keyword in Listings
+
+Listing pages don't support server-side keyword search. Options:
+1. **`web_search` with site filter**: `site:arxiv.org/abs cs.CL "large language model" 2026`
+2. **Scan listing page titles manually**: pull the listing with `web_extract`, then grep titles for your term
+3. **Combine**: search for `site:arxiv.org/abs cs.CL "exact phrase"` to get paper IDs directly from search index
 
 
 | API | Rate | Auth |
