@@ -26,7 +26,7 @@ pip install youtube-transcript-api
 
 ### Fetch Transcript Script
 
-```bash
+```
 # JSON output with metadata
 python3 SKILL_DIR/scripts/fetch_transcript.py "https://youtube.com/watch?v=VIDEO_ID"
 
@@ -44,24 +44,39 @@ python3 SKILL_DIR/scripts/fetch_transcript.py "URL" --language tr,en
 
 Use `--save-dir DIR` (or set `SAVE_DIR` environment variable) to persist raw transcript JSON + timestamped text files:
 
-```bash
+```
 SKILL_DIR/scripts/fetch_transcript.py "URL" --save-dir /path/to/transcripts
 ```
 Saves: `{DIR}/{VIDEO_ID}.json` (full transcript data) and `{DIR}/{VIDEO_ID}_timestamped.txt` (readable format).
 
 ### Generate Luna Digest Script
 
-```bash
+```
 # Generate Luna digest from timestamped transcript file
 python3 SKILL_DIR/scripts/generate_luna_digest.py "timestamped_transcript.txt"`
 ```
 
 > **Note**: The provided `generate_luna_digest.py` script may not work reliably with all transcript formats or may produce no output. In automated workflows, be prepared to immediately use the fallback method if the script fails or produces no output.
-\n\n> **Fallback method**: When the standard script fails or produces no output:\n> 1. Strip timestamps from transcript lines (remove patterns like `0:05 `, `12:34 `, or `1:05:23 ` using regex `^\\d+:\\d{2}(?:\\:\\d{2})?\\s+`)\n> 2. Join remaining text and split into sentences\n> 3. Filter to keep only meaningful sentences (length > 20 characters)\n> 4. Group sentences into thematic sections (prospects/benefits, key applications, challenges/risks, philosophical considerations)\n> 5. Format as Luna-style bullet points with `•` for main points and `◦` for sub-points\n> 6. Bold key terms on first mention\n> 7. This ensures batch processing can continue even when the standard script fails.
+
+> **Fallback method**: When the standard script fails or produces no output:
+> 1. Strip timestamps from transcript lines (remove patterns like `0:05 `, `12:34 `, or `1:05:23 ` using regex `^\d+:\d{2}(?::\d{2})?\s+`)
+> 2. Join remaining text and split into sentences
+> 3. Filter to keep only meaningful sentences (length > 20 characters)
+> 4. Group sentences into thematic sections (prospects/benefits, key applications, challenges/risks, philosophical considerations)
+> 5. Format as Luna-style bullet points with `•` for main points and `◦` for sub-points
+> 6. Bold key terms on first mention
+> 7. This ensures batch processing can continue even when the standard script fails.
 
 ## Output Formats
 
 After fetching the transcript, format it based on what the user asks for:
+
+**Raw batch-artifact file names** (for automated/unguided runs):
+- `{VIDEO_ID}_transcript.txt` — raw timestamped lines (one segment per line, `[MM:SS] text` or `M:SS text`)
+- `{VIDEO_ID}_fulltext.txt` — timestamps stripped, all text joined in a single paragraph
+- `{VIDEO_ID}_meta.json` — `{"video_id": "...", "segments_count": N, "duration_seconds": N}`
+
+**User-facing transformations**: choose one.
 
 - **Chapters**: Group by topic shifts, output timestamped chapter list
 - **Summary**: Concise 5-10 sentence overview of the entire video
@@ -118,92 +133,41 @@ Style rules:
 
 ## Workflow
 
-1. **Fetch** the transcript using the fetch_transcript.py helper script with `--text-only --timestamps`.
-2. **Validate**: check if output is a JSON error (indicating transcripts disabled, private video, etc.). If error JSON:
-   - For batch processing: skip this video and continue with next one (do NOT remove from backlog)
-   - For single video: inform user and suggest checking if subtitles are available on video page
-   If not error JSON, confirm output is non-empty and in expected language. If empty, retry without `--language` to get any available transcript. If still empty, treat as transcript disabled.
-3. **Check for existing transcript** before fetching: if `/opt/data/.hermes/content/youtube-raw/<name>.txt` already exists, skip fetching to avoid duplicates.
-4. **Chunk if needed**: if the transcript exceeds ~50K characters, split into overlapping chunks (~40K with 2K overlap) and summarize each chunk before merging.
-5. **Transform** into the requested output format:
-   - For Luna digest: first try running the generate_luna_digest.py script on the timestamped transcript
+> **Playlist-exhaustion signal** (cron runs): When an early scan shows ALL non-empty `playlist-new-ids.txt` lines carry `DONE`, the backlog has zero candidates. Report this immediately with the counts — do not silently exit or skip reporting. The user may want to know the system is clean rather than broken.
+
+1. **Determine source of truth and candidate set** before writing any files.
+   - **`yt-backlog.json` is authoritative** for which video IDs are known and their status (`unique_videos` = processed, `failed_videos` = failures). Do not derive processed/unprocessed status solely from `playlist-new-ids.txt`.
+   - **`playlist-new-ids.txt`** is a subset/incremental tracker in `ID\tSTATUS` format. A line marked `DONE` means that specific batch-adding step was committed, but the ID may already appear in `yt-backlog.json` `unique_videos` from an earlier run. Use `unique_videos` as the authoritative "already done" set.
+   - Candidates to fetch = IDs in the playlist file NOT marked `DONE`, minus any already in `yt-backlog.json` `unique_videos` or in `failed_videos` with status `confirmed_permanent`.
+2. **Locate `fetch_transcript.py` first before fetching**. Confirm which Python interpreter has `youtube-transcript-api`: `python3 -c "import youtube_transcript_api"`. If absent, use the temporary venv workaround from the Pitfalls section. Note: other batch runner scripts (e.g. `batch_fetch.py`, `batch_fetch_retry.py`) hardcode `/opt/hermes/.venv/bin/python3`, which may lack the library — do not call those scripts blindly unless the import is proven present.
+3. **Fetch** the transcript using `fetch_transcript.py` with `--text-only --timestamps`. This combination produces timestamped plain text (`M:SS text` or `[MM:SS] text`, one segment per line) — not JSON. Do not expect `segments_count` from stdout; parse the output into segments yourself if you need that number.
+4. **Validate**: after running the script, check ALL THREE indicators before trusting stdout:
+   - **rc ≠ 0** → script exited with an error code; read stderr.
+   - **stderr** contains `SSLEOFError`, `UNEXPECTED_EOF_WHILE_READING`, or `Could not retrieve` → cloud IP block; skip and mark `confirmed_permanent`. **Do NOT write stdout to file.**
+   - **stdout begins with `{"error"`** or similar JSON error object → `fetch_transcript.py` caught a network/SSL error but exited 0 with the error in stdout. This is a masked failure — treat identically to the stderr-SSL case.
+   - If none of the above: confirm stdout is non-empty and lines match `M:SS text` or `[MM:SS] text` format. If empty, retry without `--language`. If still empty, treat as transcript disabled.
+   - **Batch**: skip and continue (do NOT remove from backlog).
+   - **Single video**: inform user and suggest checking if subtitles are available on the video page.
+5. **Check for existing transcript before fetching, strict priority**. A "valid hit" = file exists + size > 500 B + first line matches timestamped format `[M:SS] text` or `M:SS text`. The first valid hit wins — do not miss a cached transcript in a lower-priority location.
+   1. `/opt/data/.hermes/content/youtube-raw/<name>_transcript.txt` — **primary output dir** (this run's current target)
+   2. `/opt/data/home/.hermes/content/youtube-raw/<name>.txt` — **home-cache** (pre-fetched from home-IP; no `_transcript` prefix in filename)
+   3. `/opt/data/.hermes/content/youtube-raw/<name>_transcript.txt` — **legacy review dir** — authoritative only if primary + home-cache both fail. See `references/legacy-review-dir-audit.md` for copy/upgrade protocol.
+   Stop checking after the first valid hit. Error stubs (`_error.txt` without a matching transcript file) are NOT valid hits — continue to the next location.
+6. **Chunk if needed**: if the transcript exceeds ~50K characters, split into overlapping chunks (~40K with 2K overlap) and summarize each chunk before merging.
+7. **Write three files per video** — always all three, never delete prior ones without inspection:
+   - `<VIDEO_ID>_transcript.txt` — raw timestamped lines as-is from source (one segment per line)
+   - `<VIDEO_ID>_fulltext.txt` — timestamps stripped, all text joined
+   - `<VIDEO_ID>_meta.json` — `{"video_id": "...", "segments_count": N, "duration_seconds": N}`
+   **Meta JSON schema**: strictly use keys `video_id` (string), `segments_count` (int), `duration_seconds` (int). Do not use `segments` or `duration` or `source` — existing files may have legacy keys but new writes must use the canonical keys.
+8. **Transform** into the requested output format:
+   - For Luna digest: first try running `generate_luna_digest.py` on the timestamped transcript
    - If the script produces no output or encounters an error, immediately use the fallback method: strip timestamps, join text, split into meaningful sentences (length > 20 chars), and create a structured digest with thematic sections following the Luna format guidelines
    - For other formats: follow the specific formatting guidelines in the Output Formats section
-6. **Verify**: re-read the transformed output to check for coherence, correct timestamps, and completeness before presenting.
-7. **Save** raw transcript to `/opt/data/.hermes/content/youtube-raw/<name>.txt`
-8. **Update backlog**: after successful processing, remove the video ID from the backlog JSON (`/opt/data/.hermes/content/yt-backlog.json` -> `unique_videos` array).
-
-## Environment Setup
-
-The scripts require `youtube-transcript-api`. Before creating temporary venvs, check if the package is already available in a system Python:
-
-```bash
-python3 -c "import youtube_transcript_api; print('OK')"
-```
-
-If available, use that Python interpreter to run the scripts. Common locations:
-- `/usr/bin/python3` (often has the package pre-installed)
-- `/opt/hermes/.venv/bin/python3` (check if the agent's venv has it)
-
-**If not available**, use the temporary venv workaround from the Pitfalls section.
-
-## Locating Scripts
-
-The skill scripts may be installed in multiple locations. Check these paths in order:
-
-```bash
-/opt/data/.hermes/skills/media/youtube-content/scripts/
-/opt/data/skills/media/youtube-content/scripts/
-/opt/data/hermes-agent/skills/media/youtube-content/scripts/
-/opt/data/repos/agent-skills/media/youtube-content/scripts/
-/opt/data/upstream-hermes-agent/skills/media/youtube-content/scripts/
-```
-
-Use `find /opt/data -name "fetch_transcript.py" -type f` if needed.
-
-## Error Handling
-
-- **Transcript disabled**: tell the user; suggest they check if subtitles are available on the video page.
-- **Private/unavailable video**: relay the error and ask the user to verify the URL.
-- **No matching language**: retry without `--language` to fetch any available transcript, then note the actual language to the user.
-- **Dependency missing**: run `pip install youtube-transcript-api` and retry.
-- **Digest script failure**: if `generate_luna_digest.py` produces no output or encounters errors, immediately use the fallback method: strip timestamps, join text, split into meaningful sentences, and create a structured digest with thematic sections following the Luna format guidelines. In automated workflows, do not spend time debugging - go directly to the fallback to ensure processing continues.
-- **Complete script failure**: if generate_luna_digest.py cannot be found or crashes irreparably, create a basic structured digest manually:
-  ```python
-  with open(transcript_file, 'r') as f:
-      lines = f.readlines()
-  text = ' '.join([line.split(' ', 1)[-1] for line in lines if line.strip()])
-  digest = f"• Core concept: {text[:100]}...\n• Key points extracted from transcript.\n"
-  ```
-- **Cloud IP blocking**: YouTube blocks transcript requests from cloud provider IPs (AWS, GCP, Azure). The script returns a JSON error: `{"error": "Could not retrieve a transcript..."}`. Workarounds:
-  - **Always check the local cache at `/opt/data/home/.hermes/content/youtube-raw/<video_id>.txt`** first, as this often contains pre-fetched transcripts that bypass the block.
-  - Use a residential proxy or VPN
-  - Use cookies from a logged-in YouTube session (`--cookies` flag if supported)
-  - Pre-fetch transcripts from a non-cloud machine and store them locally
-
-## Pitfalls
-
-- **youtube-transcript-api not installed**: The venv at `/opt/hermes/.venv` often lacks `youtube-transcript-api` and may not have `pip` available. The install also fails with `uv pip install` (permission denied writing to site-packages) and `uv pip install --user` (unsupported flag). **Correct workaround** — create a temporary venv:
-  ```bash
-  uv venv /tmp/yt-venv && uv pip install --python /tmp/yt-venv/bin/python youtube-transcript-api
-  ```
-  Then run scripts with that venv's Python:
-  ```bash
-  /tmp/yt-venv/bin/python SKILL_DIR/scripts/fetch_transcript.py "URL" --text-only --timestamps
-  ```
-  Do NOT use bare `python3` or `/opt/hermes/.venv/bin/python3` — both will fail with "youtube-transcript-api not installed."
-
-- **Flag combinations change output format**:
-  - No flags → JSON with `full_text` (plain text) + metadata
-  - `--timestamps` alone → JSON with `full_text` + `timestamped_text` field (each line: `M:SS text`)
-  - `--text-only` alone → plain text string (no JSON, no timestamps)
-  - `--text-only --timestamps` → timestamped plain text (one line per segment: `M:SS text`), no JSON wrapping
-  The workflow step 1 uses `--text-only --timestamps` intentionally — this gives raw timestamped lines suitable for LLM processing. Do NOT expect JSON when combining both flags.
-
-- **Naming mismatch**: Video IDs in the backlog JSON (e.g., `b80by3Xk_A8`) may not match transcript filenames exactly due to prefixes or suffixes. Always check for existence using `video_id` as a substring, not exact match.
-
-- **generate_luna_digest.py producing no output**: The script may exit without printing anything if there are issues with sentence extraction or if the transcript contains no valid sentences after timestamp stripping. To debug:
-  1. Run the script with a small test file and redirect stderr to see any error messages: `python3 generate_luna_digest.py test.txt 2>&1`
-  2. Add debug prints at key steps in the script (after reading file, after stripping timestamps, after sentence extraction) to see where it fails
-  3. Common issues: regex patterns not matching timestamped lines due to extra whitespace, or sentence extraction returning empty list
-  4. If debugging doesn't resolve the issue, use the fallback method: strip timestamps, join text, split into meaningful sentences (length > 20 chars), and create a structured digest with thematic sections following the Luna format guidelines.
+9. **Verify**: re-read the transformed output to check for coherence, correct timestamps, and completeness before presenting. After writing, also verify all three local files exist with non-trivial sizes.
+10. **Save** raw transcript to `/opt/data/.hermes/content/youtube-raw/<name>.txt` (also save to home-cache path when home-cache was the source so both paths stay in sync).
+11. **Synchronise `yt-backlog.json` (authoritative) BEFORE marking `playlist-new-ids.txt` DONE**:
+   - Add processed video IDs to `unique_videos`.
+   - **Pre-batch promotion pass**: before starting the batch, scan `failed_videos` for IDs whose transcript file now exists in any of the three transcript dirs; promote those candidates out of `confirmed_permanent` and into `unique_videos`, changing their status to `cloud_ip_blocked_recovered` with a note explaining the recovery path (home-cache, legacy dir, or re-fetch). This accounts for the regularly-seen 8–12 stale `confirmed_permanent` entries per batch.
+   - For videos that just succeeded: remove from `failed_videos` entirely (do not keep a stale `confirmed_permanent` entry alongside the new `unique_videos` entry).
+   - Add confirmed new failures to `failed_videos` with `status: confirmed_permanent` or `status: cloud_ip_blocked_recovered`, with a descriptive `note` string.
+   - Set `last_updated` to UTC-ISO. This is the only place batch completion is authoritatively recorded. `playlist-new-ids.txt` DONE marking is secondary/provisional and may lag.
