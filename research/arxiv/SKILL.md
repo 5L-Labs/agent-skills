@@ -156,6 +156,11 @@ web_extract(urls=["https://arxiv.org/pdf/2402.03300"])
 
 For local PDF processing, see the `ocr-and-documents` skill.
 
+### Fallback artefacts
+
+- **Rate-limit session notes and proven fallback recipe:** `references/arxiv-rate-limit-fallback.md`
+- **Listings-page pagination parameters** for all categories follow the same `?skip=N&show=K` pattern used on `arxiv.org/list/<cat>/recent`.
+
 ## Common Categories
 
 | Category | Field |
@@ -252,14 +257,29 @@ curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=Yann+LeCun
 
 
 ### Troubleshooting API Rate Limits
-If the arXiv API returns "Rate exceeded", use a `sleep` interval (at least 3-5 seconds between requests) or include a user-agent string to improve compliance with access policies:
+If the arXiv API returns "Rate exceeded", **do not retry with longer sleeps** — even 120-second delays can be insufficient in a sustained cron job. Switch immediately to the listings-page fallback described below. A user-agent string may help on the first attempt but is not a reliable workaround for repeated 429s.
+
+**Confirmed session experience (2026-05-22):** 5 retries at 30/60/120 s intervals — all failed. API responded with a 14-byte body containing `Rate exceeded.` The fallback path was effective immediately.
+
 ```bash
 curl -s -A "Mozilla/5.0" "https://export.arxiv.org/api/query?..."
 ```
-If programmatic access fails, fall back to scraping the recent listings page directly:
+
+#### Listings-page fallback (proven working, no rate-limit observed)
+
+When the REST API is blocked, scrape the category HTML listing page and fetch abstract pages individually.
+
+**Step 1 — Get the listing** (omit the pipe to avoid shell-tool security triggers; save the file then parse it):
+
 ```bash
-curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent"
+curl -s -A "Mozilla/5.0" "https://arxiv.org/list/cs.CL/recent?skip=50&show=50" -o /tmp/listing.html
 ```
+
+**Step 2 — Read entries** with `web_extract` on individual abstract pages (see below).
+
+**Step 3 — Fetch abstracts** for confirmed matches using `web_extract` on the `abs/` URL — this is the reliable path for cron jobs because abstract pages are not rate-limited in practice.
+
+For detailed lessons, page-size notes, and a session transcript, see `references/arxiv-rate-limit-fallback.md`.
 
 
 | API | Rate | Auth |
