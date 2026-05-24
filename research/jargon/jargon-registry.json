@@ -1,0 +1,295 @@
+{
+  "config": {
+    "version": 1,
+    "default_levels": [
+      "doctor",
+      "lawyer",
+      "high-school",
+      "kindergarten"
+    ],
+    "last_theme_refresh": null
+  },
+  "themes": [],
+  "terms": {
+    "AGI": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Artificial General Intelligence, a type of AI that can perform any intellectual task as well as or better than a human.",
+        "lawyer": "Advanced artificial intelligence capable of performing various cognitive tasks at the level of a human expert.",
+        "high-school": "A highly advanced form of artificial intelligence that can do almost anything a person can do in terms of thinking and problem-solving.",
+        "kindergarten": "Really smart computer that can think like a grown-up."
+      },
+      "first_seen": "2026-05-23T16:19:00Z",
+      "last_seen": "2026-05-23T16:19:00Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "HBM": {
+      "theme": "Hardware & IoT",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "High-Bandwidth Memory, a type of memory used in AI chips to increase the speed and efficiency of data transfer.",
+        "lawyer": "High-speed memory used in advanced computer chips for faster data processing.",
+        "high-school": "Special kind of memory that helps computers work faster with big numbers and pictures.",
+        "kindergarten": "Super fast toy box for computer brains."
+      },
+      "first_seen": "2026-05-23T16:19:00Z",
+      "last_seen": "2026-05-23T16:19:00Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "Appshots": {
+      "theme": "Developer Tools & Infrastructure",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Snapshots of application windows that can be attached to Codex threads, providing context for the work being done.",
+        "lawyer": "Captured images of your computer screens that help explain what you are working on in Codex.",
+        "high-school": "Pictures of what you are doing on your computer that you can send to help explain your project.",
+        "kindergarten": "Photos of what you are looking at on the computer to show others."
+      },
+      "first_seen": "2026-05-23T16:19:00Z",
+      "last_seen": "2026-05-23T16:19:00Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "Command A+": {
+      "theme": "Developer Tools & Infrastructure",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "A feature in the Hugging Face framework that allows for efficient model serving with reduced computational resources.",
+        "lawyer": "A method to make AI models run faster and use less power without losing performance.",
+        "high-school": "A way to make your computer learn things more quickly and use less battery.",
+        "kindergarten": "A magic button that makes the computer learn faster and not get tired."
+      },
+      "first_seen": "2026-05-23T16:19:00Z",
+      "last_seen": "2026-05-23T16:19:00Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "W4A4 quantization": {
+      "theme": "Developer Tools & Infrastructure",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "A technique for reducing the precision of model weights in machine learning models to save computational resources.",
+        "lawyer": "A method to make AI models smaller and faster by using less data, but still work well.",
+        "high-school": "A way to make computer brains use less space while still being smart.",
+        "kindergarten": "Making the computer brain smaller so it uses less battery."
+      },
+      "first_seen": "2026-05-23T16:19:00Z",
+      "last_seen": "2026-05-23T16:19:00Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "Cerebras models": {
+      "theme": "Hardware & IoT",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "High-performance AI chips designed by Cerebras Systems for large-scale machine learning tasks.",
+        "lawyer": "Advanced computer chips made to help with very complex and big data problems.",
+        "high-school": "Special computer parts that are really good at solving hard math problems quickly.",
+        "kindergarten": "Super fast computer toys."
+      },
+      "first_seen": "2026-05-23T16:19:00Z",
+      "last_seen": "2026-05-23T16:19:00Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "NEO-unify": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "kindergarten": "A special way of making a computer understand both pictures and words at the same time.",
+        "high-school": "An architecture that processes images and text together in one system, unlike usual methods where tasks are handed off separately.",
+        "lawyer": "A novel computational framework designed to unify image and text processing within a single architectural model.",
+        "doctor": "A multimodal neural network architecture that integrates the simultaneous processing of visual and textual data."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "LoRA": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "doctor",
+      "plainspeak": {
+        "kindergarten": "A way to make a computer learn new things without changing all its parts.",
+        "high-school": "Low-Rank Adaptation, a technique for fine-tuning large language models with minimal parameters.",
+        "lawyer": "A method of adapting pre-trained machine learning models by adding low-rank matrices to the existing weight matrices.",
+        "doctor": "A model adaptation approach that allows for efficient fine-tuning of large neural networks using low-rank updates."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "Mixture-of-Experts (MoE)": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "lawyer",
+      "plainspeak": {
+        "kindergarten": "A way for a computer to choose the best helper when solving a problem.",
+        "high-school": "A machine learning architecture where tasks are divided among multiple specialized models, each handling different parts of the workload.",
+        "lawyer": "A computational model that employs a combination of specialized sub-models (experts) to handle various aspects of a task, optimizing performance and resource utilization.",
+        "doctor": "An ensemble learning technique where a single model delegates tasks to multiple specialized sub-models based on their expertise."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "vector search": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "high-school",
+      "plainspeak": {
+        "kindergarten": "A way for a computer to find similar things in a big list of information.",
+        "high-school": "A method of searching through high-dimensional vector spaces to find items that are close to each other based on their similarity or distance metrics.",
+        "lawyer": "A technique used in database and information retrieval systems to efficiently search for vectors (data points) in multi-dimensional space, often employed in recommendation engines and content-based filtering.",
+        "doctor": "An algorithmic approach for querying large datasets of high-dimensional data by leveraging vector representations, enabling fast and accurate similarity searches."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "production retrieval systems": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "high-school",
+      "plainspeak": {
+        "kindergarten": "A computer system that helps find the right information when needed.",
+        "high-school": "Information retrieval systems designed to handle real-world, high-volume data requests efficiently and accurately, often used in enterprise search solutions or large-scale applications.",
+        "lawyer": "Systems engineered for practical use in retrieving relevant information from vast databases, ensuring reliability and performance under operational conditions.",
+        "doctor": "Advanced information retrieval frameworks optimized for production environments, capable of handling complex queries and high-throughput data access requirements."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "gemini API": {
+      "theme": "Developer Tools & Infrastructure",
+      "sub_theme": "",
+      "source_level": "high-school",
+      "plainspeak": {
+        "kindergarten": "A special way for computers to talk to each other.",
+        "high-school": "An application programming interface (API) provided by a service that allows developers to interact with its functionalities programmatically, often used in web and software development.",
+        "lawyer": "A set of protocols and routines for building and interacting with applications, enabling communication between different software systems or services.",
+        "doctor": "A standardized interface through which external programs can access the features and data of a particular system or service."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "Issue Triage Agent": {
+      "theme": "Developer Tools & Infrastructure",
+      "sub_theme": "",
+      "source_level": "high-school",
+      "plainspeak": {
+        "kindergarten": "A computer that helps organize problems.",
+        "high-school": "An automated system designed to prioritize and categorize issues or bugs reported in software projects, assisting developers in managing their workload efficiently.",
+        "lawyer": "A tool or service that automates the process of sorting and classifying issues or defects in a software development project, aiding in issue management and prioritization.",
+        "doctor": "An intelligent system that analyzes and categorizes reported issues in software repositories, facilitating efficient triage and resolution."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    },
+    "Mix-Quant": {
+      "theme": "AI & ML Research",
+      "sub_theme": "",
+      "source_level": "high-school",
+      "plainspeak": {
+        "kindergarten": "A way to make a computer use less power when learning new things.",
+        "high-school": "A technique combining quantization and mixed precision training in machine learning models, optimizing computational efficiency while maintaining model accuracy.",
+        "lawyer": "An approach that integrates quantization methods with mixed-precision arithmetic to reduce the computational load of deep learning models without significantly compromising their performance.",
+        "doctor": "A method for reducing the resource requirements of neural networks by employing a combination of quantization and mixed-precision training strategies, enhancing both efficiency and scalability."
+      },
+      "first_seen": "2026-05-23T16:21:58Z",
+      "last_seen": "2026-05-23T16:21:58Z",
+      "seen_count": 1,
+      "sources": [
+        {
+          "author": "X:AI High Signal",
+          "date": "2026-05-23"
+        }
+      ]
+    }
+  }
+}
