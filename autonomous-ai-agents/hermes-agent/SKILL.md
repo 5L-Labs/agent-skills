@@ -342,6 +342,43 @@ Edit with `hermes config edit` or `hermes config set section.key value`.
 
 Full config reference: https://hermes-agent.nousresearch.com/docs/user-guide/configuration
 
+### Custom Providers (config.yaml)
+
+Define local or third-party Ollama/OpenAI-compatible endpoints directly in config.yaml:
+
+```yaml
+custom_providers:
+  - name: ollama-qwen3.6:27b
+    base_url: http://host.containers.internal:11434/v1  # Docker/Podman host bridge
+    model: qwen3.6:27b
+```
+
+Use via `hermes model` (appears as a selectable provider) or via CLI: `hermes chat --provider custom:ollama-qwen3.6:27b`. The `name` field becomes the provider identifier with a `custom:` prefix. Delegate subagents can also target it by setting `provider: custom:<name>` in the delegation config.
+
+**Note:** `custom_providers` entries are separate from `fallback_providers`. Fallbacks activate when the primary provider fails; custom providers are always selectable.
+
+### Custom Providers (config.yaml)
+
+Define local or third-party Ollama/OpenAI-compatible endpoints in config.yaml for use with Hermes:
+
+```yaml
+custom_providers:
+  - name: ollama-qwen3.6:27b
+    base_url: http://host.containers.internal:11434/v1
+    model: qwen3.6:27b
+```
+
+Use via `hermes model` (appears as selectable provider) or CLI:
+```
+hermes chat --provider custom:ollama-qwen3.6:27b
+```
+
+The `name` field becomes the provider identifier with a `custom:` prefix. Delegate subagents can target it via `provider: custom:<name>`. 
+
+Separate from `fallback_providers` — fallbacks activate when the primary fails; custom providers are always selectable.
+
+**Qwen thinking models** (qwen3.x:4b, qwen3.5:4b, qwen3.6:27b, etc.): These models output reasoning in a `reasoning` field and the actual answer in `content` (chat completions) or a `thinking` field and `response` field (generate endpoint). The `/api/generate` endpoint is preferred for programmatic use — `/v1/chat/completions` may return empty `content` if `max_tokens` is too low. Set `max_tokens` / `num_predict` high enough (4000+ for small models, 8000+ for 27B) to let thinking complete. On CPU systems without GPU: ~2-3 tok/s for 27B (Q4_K_M), ~60-75 tok/s for 4B thinking models after load. However, thinking models consume 3000+ tokens just on reasoning before outputting the answer — for batch classification tasks on CPU, qwen2.5:7b (non-thinking, 7.6B) is 10x more practical than qwen3:4b (thinking, 4B) because there's no wasted reasoning tokens. Timeouts: 120s for 7B non-thinking, 600s+ for 27B thinking.
+
 ### Providers
 
 20+ providers supported. Set via `hermes model` or `hermes setup`.
