@@ -1,14 +1,27 @@
 {
+  "news-digest": {
+    "archived_at": null,
+    "created_at": "2026-05-24T07:18:19.324868+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-05-24T07:18:49.486405+00:00",
+    "last_used_at": null,
+    "last_viewed_at": null,
+    "patch_count": 2,
+    "pinned": false,
+    "state": "active",
+    "use_count": 0,
+    "view_count": 0
+  },
   "x-digest": {
     "archived_at": null,
     "created_at": "2026-05-12T09:00:57.764528+00:00",
     "last_patched_at": null,
-    "last_used_at": "2026-05-12T09:00:57.764543+00:00",
+    "last_used_at": "2026-05-24T09:00:48.623417+00:00",
     "last_viewed_at": null,
     "patch_count": 0,
     "pinned": false,
     "state": "active",
-    "use_count": 1,
+    "use_count": 2,
     "view_count": 0
   }
 }
