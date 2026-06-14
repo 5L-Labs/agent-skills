@@ -1,11 +1,12 @@
 ---
 name: x-digest
 description: Fetch and summarize X/Twitter list feeds into a digest format. Uses xapi.py (X API v2 OAuth2) as primary with transparent twitterapi.io fallback and enrichment.
-version: 4.1.0
+version: 4.2.0
 author: Hermes Agent 01
 metadata:
   hermes:
     tags: [twitter, x, social-media, digest]
+    related_skills: [unified-digest-themes, jargon]
 ---
 
 # x-digest — X/Twitter List Digest
@@ -139,6 +140,7 @@ If twitterapi.io also fails, note the error in the log and skip posting.
 
 - Read ALL tweet content from `/tmp/digest_tweets.txt` — skip pure RTs unless they amplify something notable
 - Group by THEME using the **unified cross-platform theme system** (canonical source: load the `unified-digest-themes` skill).
+- Decode jargon using the `jargon` skill. Scan tweet text for known terms. Skip saturated terms (e.g., LLM, AI). For non-saturated terms, show the kindergarten-level definition. Deduplicate jargon within the digest (explain each term only once).
 - Write a short paragraph per theme summarizing what's discussed and why it matters. Mention author handles.
 - If a story could fit multiple themes, use the **primary signal** rule: identify the central new information and place it under the most specific matching theme.
 
