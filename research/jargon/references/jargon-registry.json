@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_updated": "2026-05-25T08:00:00Z",
+  "last_updated": "2026-06-13T18:00:00Z",
   "terms": {
     "BERT": {
       "theme": "AI & ML Research",
@@ -218,8 +218,9 @@
         "kindergarten": "Giving the AI practice problems with the right answers to learn from"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-23",
-      "seen_in": []
+      "last_seen": "2026-06-13",
+      "saturated": true,
+      "seen_in": ["arxiv:cs.CL"]
     },
     "LoRA": {
       "theme": "AI & ML Research",
@@ -244,7 +245,8 @@
         "kindergarten": "A smart computer brain that understands words"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-25",
+      "last_seen": "2026-06-13",
+      "saturated": true,
       "seen_in": ["arxiv:cs.CL", "hn-brief:2026-05-23", "hn-brief:weekly-2026-W21"]
     },
     "VLN": {
@@ -335,6 +337,84 @@
       "first_seen": "2026-05-25",
       "last_seen": "2026-05-25",
       "seen_in": ["arxiv:cs.CL"]
+    },
+    "Boundary Sharpening": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Explicitly controlling data characteristics at the start and end of training — the training trajectory is highly sensitive to data distribution at optimization boundaries, where improper data at initialization or termination can destabilize convergence or restrict downstream performance",
+        "high-school": "Intentionally picking what kinds of examples the model sees first and last during training, because the start and end of training have disproportionate influence on what the AI learns",
+        "kindergarten": "Carefully choosing the first and last training examples, because beginnings and endings matter the most"
+      },
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-13",
+      "seen_in": ["arxiv:2605.30334"]
+    },
+    "Cyclic Scheduling": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Periodically revisiting training samples across the full difficulty spectrum during one-pass training — prevents catastrophic forgetting of foundational knowledge when the model only sees each example once, by cycling through easy-to-hard patterns instead of a single monotonic progression",
+        "high-school": "Revisiting the full range of easy-to-hard examples in cycles during training, so the AI doesn't forget basic skills as it moves to harder material",
+        "kindergarten": "Making the AI revisit easy stuff regularly so it doesn't forget the basics while learning hard stuff"
+      },
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-13",
+      "seen_in": ["arxiv:2605.30334"]
+    },
+    "Curriculum Continuity": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Maintaining smooth transitions in data attributes throughout the training sequence — abrupt fluctuations in sample difficulty can shock the optimizer, causing high gradient variance, optimization instability, and potential loss divergence",
+        "high-school": "Making sure the difficulty of training examples changes gradually, not abruptly — sudden jumps in complexity can confuse the AI's learning process and make it unstable",
+        "kindergarten": "Changing the difficulty of practice problems smoothly, not suddenly, so the AI doesn't get confused"
+      },
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-13",
+      "seen_in": ["arxiv:2605.30334"]
+    },
+    "Local Diversity": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Preserving sufficient heterogeneity among training samples within local sections of the training sequence — when mini-batch samples have nearly identical scores, gradient diversity diminishes, biasing the optimizer toward repetitive patterns and reducing the model's ability to learn generalizable features",
+        "high-school": "Making sure each small batch of training examples contains a mix of different kinds of problems, not all the same — variety within each batch prevents the AI from overfitting to narrow patterns",
+        "kindergarten": "Mixing up practice problems so the AI sees lots of different kinds together, not just the same thing over and over"
+      },
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-13",
+      "seen_in": ["arxiv:2605.30334"]
+    },
+    "STR": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Stair Ordering — a cross-guidance data ordering strategy combining Boundary Sharpening (G1), Cyclic Scheduling (G2), and Local Diversity (G4). Partitions data into stable regions (monotonic order preserved) and transition regions (interleaved via folding), with optional jittering for local diversity",
+        "high-school": "A data ordering method that keeps a global easy-to-hard progression but inserts controlled review cycles at transition points, like stairs with periodic landings",
+        "kindergarten": "Ordering training data like stairs — mostly going up, but with flat steps where the AI reviews what it knows"
+      },
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-13",
+      "seen_in": ["arxiv:2605.30334"]
+    },
+    "SAW": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Saw Ordering — extends STR by integrating all four guidances (G1-G4), replacing folding in transition regions with Zig-zag ordering (ZIG) to ensure smooth continuity between region boundaries, producing a sawtooth pattern of data difficulty",
+        "high-school": "Like STR but with smoother transitions between difficulty levels — instead of sudden jumps, it creates a continuous sawtooth pattern that avoids shocking the optimizer",
+        "kindergarten": "Like stair ordering but extra smooth — the AI slides up and down gently instead of jumping between hard and easy"
+      },
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-13",
+      "seen_in": ["arxiv:2605.30334"]
     }
   }
 }
