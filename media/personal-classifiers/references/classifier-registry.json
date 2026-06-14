@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "last_updated": "2026-06-14T18:00:00Z",
+  "terms": {
+    "LLM": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 1,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["arxiv:cs.CL", "x:multiple", "hn:multiple"],
+      "notes": "Saturated — user is deeply familiar. NfM=1 means skip unless breakthrough."
+    },
+    "VPO": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "emerging",
+      "novelty_for_me": 4,
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066045540031234516"]
+    },
+    "Fable": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "disrupting",
+      "novelty_for_me": 4,
+      "first_seen": "2026-06-10",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066063225834148090", "x:2066062791006400562"]
+    },
+    "Mythos": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "disrupting",
+      "novelty_for_me": 4,
+      "first_seen": "2026-06-10",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066039579707167039"]
+    },
+    "OpenRouter Fusion": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "deploying",
+      "novelty_for_me": 4,
+      "first_seen": "2026-06-14",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066071673359524014", "x:2066045540031234516"]
+    },
+    "Cohere Command A+": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "deploying",
+      "novelty_for_me": 3,
+      "first_seen": "2026-05-20",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2057120818551734589"]
+    },
+    "Karpathy": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 2,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2056753169888334312", "x:2066038013121995050"],
+      "notes": "Career moves are notable (NfM bump when he changes jobs), but his day-to-day takes are incremental"
+    },
+    "Qwen": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2056403591464984753", "x:2046959757299487029"]
+    },
+    "Cursor": {
+      "level_of_understanding": 2,
+      "state_of_the_world": "deploying",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2056415413077233983"]
+    },
+    "OpenRouter": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2059277623629664758", "x:2053170520087024109"]
+    },
+    "Anthropic": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066060599138914773", "x:2052808789297115628"],
+      "notes": "Anthropic news is always notable. Dario saga + export controls bumped this up."
+    },
+    "NousResearch": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2054610062836892054", "x:2057483430162547195", "x:2062554136625766409"]
+    },
+    "Hermes Agent": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 2,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2062554136625766409"]
+    },
+    "CoT": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066050280190333415"]
+    },
+    "RLHF": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "mature",
+      "novelty_for_me": 1,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-01",
+      "seen_in": ["arxiv:cs.CL"],
+      "notes": "Well-understood technique. Only breakthroughs should surface."
+    },
+    "Reward Hacking": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-05-20",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2057230185339212019"]
+    },
+    "Carbon (DNA model)": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "emerging",
+      "novelty_for_me": 4,
+      "first_seen": "2026-05-20",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2057071550352781771"]
+    },
+    "Token Superposition Training": {
+      "level_of_understanding": 5,
+      "state_of_the_world": "emerging",
+      "novelty_for_me": 4,
+      "first_seen": "2026-06-13",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2054610062836892054"]
+    },
+    "grep-style retrieval": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "emerging",
+      "novelty_for_me": 4,
+      "first_seen": "2026-05-15",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2055317577031975269"]
+    },
+    "SOUL.md": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 2,
+      "first_seen": "2026-05-24",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2058584154292584853"]
+    },
+    "MCP": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "active_development",
+      "novelty_for_me": 3,
+      "first_seen": "2026-04-01",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:multiple", "hn:multiple"]
+    },
+    "GPU compute to HBM shift": {
+      "level_of_understanding": 4,
+      "state_of_the_world": "disrupting",
+      "novelty_for_me": 4,
+      "first_seen": "2026-04-29",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2049370967349371181"]
+    },
+    "OpenAI fine-tuning winding down": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "disrupting",
+      "novelty_for_me": 3,
+      "first_seen": "2026-05-08",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2052788338029981916", "x:2053508329318830312"]
+    },
+    "Sovereign AI": {
+      "level_of_understanding": 3,
+      "state_of_the_world": "regulatory",
+      "novelty_for_me": 3,
+      "first_seen": "2026-06-14",
+      "last_seen": "2026-06-14",
+      "seen_in": ["x:2066029205779808450", "x:2066080219165769987"]
+    }
+  },
+  "items": {}
+}
