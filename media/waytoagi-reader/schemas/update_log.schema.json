@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "waytoagi update-log output",
+  "type": "object",
+  "required": ["schema_version", "source_url", "heading", "found", "days"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source_url": {"type": "string"},
+    "heading": {"type": ["string", "null"]},
+    "heading_id": {"type": ["string", "null"]},
+    "found": {"type": "boolean"},
+    "days": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "heading": {"type": ["string", "null"]},
+          "heading_id": {"type": ["string", "null"]},
+          "month": {"type": ["string", "null"], "description": "Set only by archive output, the heading2 label this day falls under."},
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "type": {"type": "string"},
+                "title": {"type": ["string", "null"]},
+                "url": {"type": ["string", "null"]},
+                "summary": {"type": ["string", "null"]}
+              }
+            }
+          }
+        }
+      }
+    },
+    "items": {
+      "description": "Present only when --flatten was used.",
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}
