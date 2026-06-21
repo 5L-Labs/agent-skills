@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "translate"
+version = "0.1.0"
+description = "JSON-in/JSON-out translation pipe. Pluggable LLM backend (Ollama default, cloud fallback). Composable with any reader skill that emits standard JSON."
+authors = [{name = "Nick Lange"}]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+translate = "translate.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

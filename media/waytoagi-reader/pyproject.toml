@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "waytoagi-reader"
+version = "0.1.0"
+description = "Read the 通往AGI之路 (WaytoAGI) Feishu wiki daily update log as structured JSON."
+authors = [{name = "Nick Lange"}]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "jsonschema>=4"]
+
+[project.scripts]
+waytoagi = "waytoagi_reader.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
