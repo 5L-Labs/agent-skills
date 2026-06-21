@@ -1,7 +1,7 @@
 ---
 name: github
 description: "Single authoritative skill for all GitHub interaction via `gh` CLI. NEVER use raw curl api.github.com — gh saves ~80% tokens vs curl (no auth headers, no JSON parsing, no URL construction). Always load this skill before any GitHub operation."
-version: 1.0.0
+version: 1.1.0
 author: Hermes Agent 01
 license: MIT
 metadata:
@@ -111,6 +111,16 @@ export GH_CONFIG_DIR="/opt/data/.config/gh" && export PATH="/opt/data/.local/bin
 ```
 
 This one command: sets env vars → installs gh if missing → rebuilds auth config if broken → verifies everything.
+
+Expected output on success:
+```
+gh READY
+github.com
+  ✓ Logged in to github.com account 5L-hermes01
+  - Active account: true
+  - Git operations protocol: https
+{JSON repo info}
+```
 
 **Simplify further** — the env file handles two of three failure modes:
 
@@ -576,7 +586,48 @@ git branch -D pr-$PR 2>/dev/null
 
 ---
 
-## Pitfalls & Notes
+## 10. Verification / Health Check
+
+Run this single command to verify everything is operational:
+
+```bash
+source /opt/data/.config/github/env.sh 2>/dev/null; \
+echo "=== gh binary ===" && command -v gh && gh --version && \
+echo "=== auth ===" && gh auth status -h github.com && \
+echo "=== API ===" && gh api rate_limit --jq '.rate.remaining' | xargs echo "API calls remaining:" && \
+echo "=== repos ===" && gh repo view 5L-hermes01/agent-skills --json name,isFork,parent && \
+echo "=== PR access ===" && gh pr list --repo 5L-Labs/agent-skills --limit 3 --json number,title,state && \
+echo "ALL GREEN"
+```
+
+### What each step tests
+
+| Step | Tests | Failure mode |
+|------|-------|-------------|
+| `command -v gh` | Binary exists in PATH | gh not installed → run 0.1 |
+| `gh auth status` | Token valid & config readable | Needs auth → run 0.2 |
+| `gh api rate_limit` | API credentials work | Token expired or revoked |
+| `gh repo view ...` | Can read our repos | Token scope too narrow |
+| `gh pr list ...` | Can access PR endpoints | Missing `repo` scope |
+
+### Common failure modes & fixes
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `gh: command not found` | Binary missing or PATH wrong | `source /opt/data/.config/github/env.sh` or run section 0.1 |
+| `You are not logged into any GitHub hosts` | `GH_CONFIG_DIR` not set or hosts.yml missing | `source env.sh` then section 0.2 |
+| `error validating token: missing required scope 'read:org'` | Token doesn't have org scope | This is a WARNING — most operations still work. Ignore unless you need org access. |
+| `Not Found (404)` on repo or PR | Token scope doesn't include the repo | Check token has `repo` scope |
+| `401 Bad credentials` | Token expired or revoked | Update PAT in `/opt/data/config/github/.pat` and `/opt/data/home/.git-credentials` |
+
+### Enforcement: how we guarantee gh over curl
+
+The `github` skill is the ONLY authorized path for GitHub operations. Here's how we enforce that:
+
+1. **Skill-level** — this SKILL.md's header states "NEVER use raw curl." The skill description is checked by `skill_view` before any session runs GitHub operations.
+2. **Memory** — the persistent memory entry says "ALL GitHub API calls use gh CLI (never raw curl). Load the `github` skill for any GitHub op."
+3. **Audit trail** — the existing `github/github-auth`, `github/github-code-review`, `github/github-pr-workflow`, `github/github-issues`, `github/github-repo-management` skills are flagged as "contains curl — should be migrated to gh."
+4. **Self-test** — this verification section. Run it after any container rebuild to confirm gh is operational. If it fails, gh is broken and curl is the fallback (which will be caught and flagged as tech debt in the next session).
 
 - **GH_CONFIG_DIR** must be set — gh defaults to `~/.config/gh/` which may not resolve to `/opt/data/.config/gh/` depending on `$HOME`.
 - **Inline comments** still need `gh api` (no native `gh pr review --inline` flag). But `gh api` is still more concise than raw curl — no auth header, shorter URL.
