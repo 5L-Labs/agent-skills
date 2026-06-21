@@ -57,20 +57,23 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None):
     offset = 0
     
     # Query up to 15 pages to find matches across entire inventory
-    for page in range(15):
-        url = f"https://api.visor.vin/v1/listings?make={make}&model={model}&limit={limit}&offset={offset}"
-        try:
-            r = requests.get(url, headers=headers, timeout=10)
-            if r.status_code == 200:
-                data = r.json().get("data", [])
-                if not data:
+    if api_key:
+        for page in range(15):
+            url = f"https://api.visor.vin/v1/listings?make={make}&model={model}&limit={limit}&offset={offset}"
+            try:
+                r = requests.get(url, headers=headers, timeout=10)
+                if r.status_code == 200:
+                    data = r.json().get("data", [])
+                    if not data:
+                        break
+                    listings.extend(data)
+                    offset += limit
+                else:
+                    print(f"[-] Warning: Visor API request failed with status code {r.status_code}", file=sys.stderr)
                     break
-                listings.extend(data)
-                offset += limit
-            else:
+            except Exception as e:
+                print(f"[-] Warning: Visor API request failed with error: {e}", file=sys.stderr)
                 break
-        except Exception:
-            break
             
     # Determine target powertrain and inventory type from target VIN
     target_powertrain = None
@@ -136,7 +139,19 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None):
             matching.append(car)
             
     # Also load from saved file if API has fewer matches
-    saved_path = "/Users/njl/dev/src/mkai/car_buying/data/comprehensive_search_results.json"
+    # Locate data relative to project root to avoid hardcoded paths
+    project_root = os.getcwd()
+    current = os.path.dirname(os.path.abspath(__file__))
+    while current and current != os.path.dirname(current):
+        if os.path.exists(os.path.join(current, ".git")) or os.path.exists(os.path.join(current, ".agents")):
+            project_root = current
+            break
+        current = os.path.dirname(current)
+        
+    saved_path = os.path.join(project_root, "data", "comprehensive_search_results.json")
+    if not os.path.exists(saved_path):
+        saved_path = os.path.join(os.getcwd(), "data", "comprehensive_search_results.json")
+        
     if os.path.exists(saved_path):
         try:
             with open(saved_path, "r") as f:
@@ -191,8 +206,24 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None):
     return cheapest_regional, cheapest_nationwide, matching[:10]
 
 def main():
-    load_dotenv("/Users/njl/dev/src/mkai/car_buying/.env")
+    # Find project root to load .env dynamically
+    project_root = os.getcwd()
+    current = os.path.dirname(os.path.abspath(__file__))
+    while current and current != os.path.dirname(current):
+        if os.path.exists(os.path.join(current, ".git")) or os.path.exists(os.path.join(current, ".agents")):
+            project_root = current
+            break
+        current = os.path.dirname(current)
+        
+    dotenv_path = os.path.join(project_root, ".env")
+    if os.path.exists(dotenv_path):
+        load_dotenv(dotenv_path)
+    else:
+        load_dotenv()
+        
     api_key = os.getenv("VISOR.VIN_API_KEY") or os.getenv("VISOR_API_KEY")
+    if not api_key:
+        print("[-] Warning: VISOR_API_KEY environment variable is not set. Visor API live search will be skipped.", file=sys.stderr)
     
     parser = argparse.ArgumentParser(description="Negotiator Tool - Calculates OTD spreads and bids.")
     parser.add_argument("--vin", type=str, help="VIN of the target vehicle")
