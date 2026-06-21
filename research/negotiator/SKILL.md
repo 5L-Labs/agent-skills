@@ -27,6 +27,12 @@ To run the negotiator tool, you need to configure the following environment vari
 
 *   `VISOR.VIN_API_KEY` (or `VISOR_API_KEY`): Required. The bearer API token used to query the live Visor API (`https://api.visor.vin/v1/listings`) for real-time inventory listings.
 
+## Dependencies
+
+This skill requires the following Python libraries:
+*   `requests`
+*   `python-dotenv`
+
 ## How to Run
 
 Execute the tool via Python:
