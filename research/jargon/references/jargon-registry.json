@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_updated": "2026-05-25T08:00:00Z",
+  "last_updated": "2026-06-18T08:00:00Z",
   "terms": {
     "BERT": {
       "theme": "AI & ML Research",
@@ -167,7 +167,7 @@
         "kindergarten": "Teaching AI by letting it see many answers and picking the best groups"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-24",
+      "last_seen": "2026-06-18",
       "seen_in": ["arxiv:cs.CL"]
     },
     "RLHF": {
@@ -218,8 +218,8 @@
         "kindergarten": "Giving the AI practice problems with the right answers to learn from"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-23",
-      "seen_in": []
+      "last_seen": "2026-06-18",
+      "seen_in": ["arxiv:cs.CL"]
     },
     "LoRA": {
       "theme": "AI & ML Research",
@@ -244,7 +244,7 @@
         "kindergarten": "A smart computer brain that understands words"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-25",
+      "last_seen": "2026-06-18",
       "seen_in": ["arxiv:cs.CL", "hn-brief:2026-05-23", "hn-brief:weekly-2026-W21"]
     },
     "VLN": {
@@ -282,8 +282,8 @@
         "kindergarten": "A computer reading printed words and turning them into editable text"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-24",
-      "seen_in": ["hn-brief:2026-05-23", "hn-brief:weekly-2026-W21"]
+      "last_seen": "2026-06-18",
+      "seen_in": ["hn-brief:2026-05-23", "hn-brief:weekly-2026-W21", "arxiv:cs.CL"]
     },
     "BASIC": {
       "theme": "Community & Culture",
@@ -334,6 +334,70 @@
       },
       "first_seen": "2026-05-25",
       "last_seen": "2026-05-25",
+      "seen_in": ["arxiv:cs.CL"]
+    },
+    "CoT": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Papers & Theory",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Chain-of-thought reasoning — a prompting technique where the model generates intermediate reasoning steps before arriving at a final answer, improving performance on multi-step reasoning tasks",
+        "high-school": "A technique where AI shows its work step-by-step before giving an answer, making it better at math and logic problems",
+        "kindergarten": "Making AI show its work one step at a time, like showing your math homework"
+      },
+      "first_seen": "2026-06-18",
+      "last_seen": "2026-06-18",
+      "seen_in": ["arxiv:cs.CL"]
+    },
+    "POMDP": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Agents & Agent Systems",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Partially Observable Markov Decision Process — a mathematical framework for sequential decision-making where the agent does not have full access to the system state and must maintain a probability distribution (belief) over possible states",
+        "high-school": "A planning framework for AI agents that must make decisions without seeing the full picture, using probabilities to guess what's happening",
+        "kindergarten": "A way for AI to make good decisions even when it can't see everything at once"
+      },
+      "first_seen": "2026-06-18",
+      "last_seen": "2026-06-18",
+      "seen_in": ["arxiv:cs.CL"]
+    },
+    "MCMC": {
+      "theme": "Science & Technology",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Markov Chain Monte Carlo — a class of algorithms for sampling from probability distributions by constructing a Markov chain whose stationary distribution equals the target distribution, enabling approximate inference in complex probabilistic models",
+        "high-school": "A statistical technique that draws representative samples from complex probability distributions by walking through the space of possible values",
+        "kindergarten": "A math technique that explores possibilities randomly to find likely answers"
+      },
+      "first_seen": "2026-06-18",
+      "last_seen": "2026-06-18",
+      "seen_in": ["arxiv:cs.CL"]
+    },
+    "CPT": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Continual pre-training — continuing the language modeling objective on domain-specific data after initial pretraining, adapting the model to a specialized domain without full retraining",
+        "high-school": "Continuing to train a pre-trained AI model on specialized text data so it learns domain-specific knowledge",
+        "kindergarten": "Extra training on specialized material so the AI becomes an expert in a specific field"
+      },
+      "first_seen": "2026-06-18",
+      "last_seen": "2026-06-18",
+      "seen_in": ["arxiv:cs.CL"]
+    },
+    "MAS": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Agents & Agent Systems",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Multi-agent systems — computational systems composed of multiple interacting intelligent agents that coordinate, cooperate, or compete to achieve individual or shared objectives",
+        "high-school": "Systems of multiple AI agents that work together or compete to solve problems",
+        "kindergarten": "Teams of AI programs that talk to each other to get things done"
+      },
+      "first_seen": "2026-06-18",
+      "last_seen": "2026-06-18",
       "seen_in": ["arxiv:cs.CL"]
     }
   }
