@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 
@@ -16,9 +15,20 @@ EXIT_BAD_INPUT = 2
 EXIT_BACKEND = 4
 
 
-def _prompt_hash(backend_name: str) -> str:
-    # Bump if the system prompt changes — invalidates relevant cache entries.
-    return hashlib.sha256(f"v1:{backend_name}".encode("utf-8")).hexdigest()[:16]
+def _safe_cache_get(*args, **kwargs):
+    try:
+        return cache_mod.get(*args, **kwargs)
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] cache read failed: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+
+
+def _safe_cache_put(*args, **kwargs) -> None:
+    """A cache write failure must never abort an otherwise-successful translation run."""
+    try:
+        cache_mod.put(*args, **kwargs)
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] cache write failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 def _parse_fields(spec: str | None) -> frozenset[str]:
@@ -59,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     backend = get_backend(args.backend, model=args.model)
     fields = _parse_fields(args.field)
     cache_dir = cache_mod.default_cache_dir()
-    prompt_hash = _prompt_hash(backend.name)
+    sig = backend.cache_signature()
     n_total = 0
     n_hit = 0
     n_translated = 0
@@ -71,22 +81,13 @@ def main(argv: list[str] | None = None) -> int:
         n_total += 1
         translation: str | None = None
         if not args.no_cache:
-            translation = cache_mod.get(
-                cache_dir, value, args.source, args.target,
-                backend.name, getattr(backend, "model", backend.name), prompt_hash,
-            )
+            translation = _safe_cache_get(cache_dir, value, args.source, args.target, sig)
             if translation is not None:
                 n_hit += 1
         if translation is None:
             try:
                 translation = backend.translate(value, source=args.source, target=args.target)
                 n_translated += 1
-                if not args.no_cache:
-                    cache_mod.put(
-                        cache_dir, value, args.source, args.target,
-                        backend.name, getattr(backend, "model", backend.name), prompt_hash,
-                        translation,
-                    )
             except Exception as e:  # noqa: BLE001
                 n_error += 1
                 err_key = f"{key}_{args.target}_error"
@@ -95,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 container[f"{key}_{args.target}"] = None
                 continue
+            if not args.no_cache:
+                _safe_cache_put(cache_dir, value, args.source, args.target, sig, translation)
         if args.inplace:
             container[key] = translation
         else:

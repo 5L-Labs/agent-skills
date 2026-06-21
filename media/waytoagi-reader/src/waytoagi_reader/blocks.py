@@ -135,11 +135,25 @@ def normalize_heading(s: str) -> str:
     return re.sub(r"[\s -⁯\U0001F000-\U0001FFFF\W_]+", "", s)
 
 
-def find_heading(blocks: dict, needle: str) -> str | None:
+def find_heading(blocks: dict, needle: str, *, fuzzy: bool = False) -> str | None:
+    """Locate a heading block by its rendered text.
+
+    Default match is exact equality on the normalized text (emoji, whitespace
+    and punctuation stripped). Set `fuzzy=True` to fall back to substring
+    matching — the older, lenient behavior — when the heading glyph drifts."""
     target = normalize_heading(needle)
+    if not target:
+        return None
     for bid, b in blocks.items():
-        if heading_level(block_type(b)) is not None:
-            if target and target in normalize_heading(render_text(b)):
+        if heading_level(block_type(b)) is None:
+            continue
+        if normalize_heading(render_text(b)) == target:
+            return bid
+    if fuzzy:
+        for bid, b in blocks.items():
+            if heading_level(block_type(b)) is None:
+                continue
+            if target in normalize_heading(render_text(b)):
                 return bid
     return None
 

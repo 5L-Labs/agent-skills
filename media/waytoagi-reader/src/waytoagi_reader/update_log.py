@@ -1,6 +1,8 @@
 """Render the '近 7 日更新日志' section as structured JSON."""
 from __future__ import annotations
 
+import sys
+
 from .blocks import (
     block_children,
     block_parent,
@@ -50,6 +52,7 @@ def _render_item(blocks: dict, bid: str) -> dict:
 
 def _render_day(blocks: dict, day_head_id: str) -> dict:
     head = blocks[day_head_id]
+    heading_text = render_text(head).strip() or None
     items: list[dict] = []
     for cid in block_children(head):
         if cid not in blocks:
@@ -57,21 +60,32 @@ def _render_day(blocks: dict, day_head_id: str) -> dict:
         item = _render_item(blocks, cid)
         if item["title"] or item["summary"] or item["type"] in {"image", "divider"}:
             items.append(item)
+    if heading_text and not items:
+        # Surface (don't silently drop) old-format edge cases the user can act on —
+        # e.g. the 2025-05-22 archive entry that returns 0 renderable children.
+        print(
+            f"[warn] day heading {heading_text!r} ({day_head_id}) has 0 renderable children — "
+            "possible older Feishu encoding or stripped content",
+            file=sys.stderr,
+        )
     return {
         "heading_id": day_head_id,
-        "heading": render_text(head).strip() or None,
+        "heading": heading_text,
         "items": items,
     }
 
 
-def render(blocks: dict, *, heading: str, source_url: str) -> dict:
+def render(blocks: dict, *, heading: str, source_url: str, fuzzy: bool = False) -> dict:
     """Return the structured update-log dict for the given heading.
 
     Days are heading-level blocks inside the section; each day's items are the
     children of that day heading. Non-heading blocks that appear directly under
     the section (intro/outro text, dividers) are surfaced under a synthetic
-    pre-day with `heading=None`."""
-    head_id = find_heading(blocks, heading)
+    pre-day with `heading=None`.
+
+    `fuzzy=True` falls back to substring matching when exact-normalized match
+    fails — useful when the section heading glyph drifts."""
+    head_id = find_heading(blocks, heading, fuzzy=fuzzy)
     if not head_id:
         return {
             "schema_version": 1,

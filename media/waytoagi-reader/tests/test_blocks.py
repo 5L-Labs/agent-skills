@@ -130,6 +130,13 @@ def test_find_heading_normalized():
     assert find_heading(SYNTH_BLOCKS, "Nope") is None
 
 
+def test_find_heading_is_exact_by_default():
+    """A partial substring must not match an unrelated heading — reviewer flagged
+    the prior substring-only behavior as a false-positive risk."""
+    assert find_heading(SYNTH_BLOCKS, "Foo") is None
+    assert find_heading(SYNTH_BLOCKS, "Foo", fuzzy=True) == "h_target"
+
+
 def test_collect_section_stops_at_same_level_heading():
     ids = collect_section(SYNTH_BLOCKS, "h_target")
     assert ids == ["d_one", "i_one", "d_two", "i_two"]

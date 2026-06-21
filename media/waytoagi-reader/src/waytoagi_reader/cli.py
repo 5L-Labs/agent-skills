@@ -62,7 +62,7 @@ def _cmd_update_log(args) -> int:
         archive_blocks = _fetch_and_extract(archive_url, cache_mode)
         out = archive.render(archive_blocks, source_url=archive_url)
     else:
-        out = render(main_blocks, heading=args.heading, source_url=args.url)
+        out = render(main_blocks, heading=args.heading, source_url=args.url, fuzzy=args.fuzzy)
 
     if not out["found"]:
         print(f"[err] heading not found: {args.heading!r}", file=sys.stderr)
@@ -99,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("update-log", help="Fetch and render the WaytoAGI daily update log.")
     p.add_argument("--url", default=DEFAULT_URL)
     p.add_argument("--heading", default=DEFAULT_HEADING,
-                   help="Section heading text to match (normalized; emoji-tolerant).")
+                   help="Section heading text to match (normalized; emoji-tolerant). Exact match by default.")
+    p.add_argument("--fuzzy", action="store_true",
+                   help="Fall back to substring matching on the heading when exact-normalized match fails.")
     p.add_argument("--date", help="Filter to one day by substring match on the day heading (e.g. '6 月 18 日').")
     p.add_argument("--flatten", action="store_true", help="Emit a flat items[] list instead of days[].")
     p.add_argument("--archive", action="store_true",
