@@ -20,13 +20,18 @@ Load this skill alongside your primary skill (e.g., hn-brief-digest, x-digest) b
 
 | # | Theme | Description |
 |---|-------|-------------|
-| 1 | AI & ML Research | Models, architectures, training, benchmarks, agents, papers — see [sub-theme reference](references/ai-ml-research-sub-themes.md) for granular breakdown |
-| 2 | Developer Tools & Infrastructure | IDEs, workflows, compute, platforms, agent tooling, MCP |
-| 3 | Hardware & IoT | Chips, devices, embedded, robotics, edge inference |
-| 4 | Security & Privacy | Vulnerabilities, breaches, encryption, prompt injection, alignment safety |
-| 5 | Industry & Business | Funding, companies, products, pricing, policy, regulation |
-| 6 | Science & Technology | Physics, bio, space, general science, interdisciplinary research |
-| 7 | Community & Culture | Meta-discussions, events, nostalgia, offbeat, hot takes, memes |
+| 1 | Geopolitics & World Affairs | International conflict, diplomacy, U.S. politics, government power, trade, sanctions — see [reference](references/additional-theme-families.md) |
+| 2 | AI & ML Research | Models, architectures, training, benchmarks, agents, papers — see [sub-theme reference](references/ai-ml-research-sub-themes.md) for granular breakdown |
+| 3 | Developer Tools & Infrastructure | IDEs, workflows, compute, platforms, agent tooling, MCP |
+| 4 | Hardware & IoT | Chips, devices, embedded, robotics, edge inference |
+| 5 | Security & Privacy | Vulnerabilities, breaches, encryption, prompt injection, alignment safety |
+| 6 | Industry & Business | Funding, companies, products, pricing, policy, regulation |
+| 7 | Science & Technology | Physics, bio, space, general science, interdisciplinary research |
+| 8 | Career & Leadership | Hiring, recruiting, executive moves, founder/operator stories, identity shifts — see [reference](references/additional-theme-families.md) |
+| 9 | Product & Growth | Product strategy, launches, growth loops, retention, monetization, UX — see [reference](references/additional-theme-families.md) |
+| 10 | Science & Health | Medical research, biology, brain science, climate, space — see [reference](references/additional-theme-families.md) |
+| 11 | Community & Culture | Meta-discussions, events, nostalgia, offbeat, hot takes, memes |
+| 12 | Community & Events | Meetups, conferences, webinars, bootcamps, talks, workshops — see [reference](references/additional-theme-families.md) |
 
 ## AI & ML Research Sub-Themes
 
@@ -41,6 +46,15 @@ Within the **AI & ML Research** theme, use these sub-themes for granular classif
 | Papers & Theory | Academic preprints, theory, interpretability, alignment, novel methods |
 
 See [references/ai-ml-research-sub-themes.md](references/ai-ml-research-sub-themes.md) for detailed overlap guidance and decision rules.
+
+## Additional Theme Families
+
+See [references/additional-theme-families.md](references/additional-theme-families.md) for detailed sub-themes and overlap guidance for:
+- Geopolitics & World Affairs
+- Career & Leadership
+- Product & Growth
+- Science & Health
+- Community & Events
 
 ## Overlap Resolution
 
@@ -66,4 +80,5 @@ When a story could fit multiple themes:
 ## Version History
 
 - 1.1.0 (2026-05-24): Added digest-aggregation-pattern.md reference for daily→weekly→monthly cache-first aggregation. Added jargon to related_skills.
+- 1.2.0 (2026-06-21): Added additional theme families and sub-themes for geopolitics, career, product, health, and events; linked canonical reference doc.
 - 1.0.0 (2026-05-18): Initial canonical taxonomy. 7 top-level themes + 5 AI & ML Research sub-themes.
