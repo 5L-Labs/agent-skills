@@ -16,13 +16,13 @@ Third-party X/Twitter data API. No OAuth needed for reads — just an `X-API-Key
 
 Set the API key in config.yaml or provide inline:
 ```
-X-API-Key: new1_03ba774bd5d7490cb30aaa8f63e6a135
+X-API-Key: YOUR_API_KEY_HERE
 ```
 
 Store in config:
 ```yaml
 twitterapi_io:
-  api_key: "new1_03ba774bd5d7490cb30aaa8f63e6a135"
+  api_key: "YOUR_API_KEY_HERE"
 ```
 
 ## Base URL
