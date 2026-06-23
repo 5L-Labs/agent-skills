@@ -19,12 +19,23 @@ STORE_ROOT = Path("/opt/data/secrets")
 def _resolve(name: str) -> Path:
     """Resolve a secret name to its absolute path in the store."""
     path = STORE_ROOT / name
+
+    # SECURITY: Prevent path traversal by checking if the resolved path is inside STORE_ROOT
+    resolved_path = path.resolve(strict=False)
+    resolved_root = STORE_ROOT.resolve(strict=False)
+    if not resolved_path.is_relative_to(resolved_root):
+        raise ValueError(f"Path traversal detected: {name}")
+
     if not path.exists():
         # Check subdirectories
         for sub in STORE_ROOT.iterdir():
             if sub.is_dir():
                 candidate = sub / name
                 if candidate.exists():
+                    # SECURITY: also check traversal for the candidate
+                    resolved_cand = candidate.resolve(strict=False)
+                    if not resolved_cand.is_relative_to(resolved_root):
+                        continue
                     return candidate
         raise FileNotFoundError(f"Secret '{name}' not found in {STORE_ROOT}")
     return path

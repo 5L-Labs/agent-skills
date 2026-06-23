@@ -1,0 +1,4 @@
+## 2025-02-17 - Path Traversal in Secret Store
+**Vulnerability:** Found a path traversal vulnerability in `devops/secret-store/scripts/secrets.py` within the `_resolve` function. Unsanitized secret names like `"../../../../etc/passwd"` would bypass the `path.exists()` check (if the targeted file exists) and allow arbitrary file reads since the function simply appended the user input to `STORE_ROOT`.
+**Learning:** The secret loader's path concatenation mechanism lacked strict boundary checks. Also learned that using string prefix checks like `str(path).startswith(str(root))` is insufficient due to sibling directories sharing the same prefix (e.g. `/opt/data/secrets` vs `/opt/data/secrets_backup`).
+**Prevention:** Always use `.resolve(strict=False)` on the computed path and ensure `resolved_path.is_relative_to(base_directory.resolve(strict=False))` before returning or accessing the file.
