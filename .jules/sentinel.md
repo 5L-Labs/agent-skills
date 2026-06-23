@@ -1,0 +1,4 @@
+## 2025-02-05 - Path Traversal Vulnerability in Secret Store Loader
+**Vulnerability:** The secret store loader (`devops/secret-store/scripts/secrets.py`) lacked path validation in the `_resolve` function, allowing agents or inputs to supply a secret name like `../../../etc/passwd` to read arbitrary files on the host filesystem under the guise of secret loading.
+**Learning:** Even when path resolution looks straightforward (e.g. concatenating `STORE_ROOT / name`), it does not prevent path traversal if the inputs contain `../` sequences. A `pathlib` construct does not automatically restrict the resolved path to be within its parent.
+**Prevention:** Use `pathlib.Path.resolve()` on both the base directory and the user-supplied path to normalize paths, then use `.is_relative_to(base_dir)` to enforce that the target path is strictly contained within the intended base directory.
