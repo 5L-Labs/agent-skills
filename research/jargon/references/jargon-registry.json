@@ -335,6 +335,19 @@
       "first_seen": "2026-05-25",
       "last_seen": "2026-05-25",
       "seen_in": ["arxiv:cs.CL"]
+    },
+    "TTS": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Benchmarks & Evaluation",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Text-to-speech — the computational synthesis of spoken audio from written text, involving linguistic analysis, prosody modeling, and waveform generation",
+        "high-school": "Converting written text into spoken audio using synthetic voice generation, used in virtual assistants, audiobooks, and accessibility tools",
+        "kindergarten": "Turning written words into spoken audio so a computer can read text out loud"
+      },
+      "first_seen": "2026-06-24",
+      "last_seen": "2026-06-24",
+      "seen_in": ["arxiv:cs.CL"]
     }
   }
 }
