@@ -407,6 +407,7 @@ def verify_car_options(car, profile, cache_dict):
             matches = is_pinnacle and has_sound
             if not matches:
                 print(f"[-] Option mismatch on Chrysler sticker for {vin} (Pinnacle={is_pinnacle}, HK={has_sound})", file=sys.stderr)
+            cache_dict[vin] = matches
         else:
             vdp_text = fetch_vdp_content(vdp_url)
             if vdp_text:
@@ -415,6 +416,7 @@ def verify_car_options(car, profile, cache_dict):
                 matches = is_pinnacle and has_sound
                 if not matches:
                     print(f"[-] Option mismatch on VDP for Pacifica {vin}", file=sys.stderr)
+                cache_dict[vin] = matches
             else:
                 print(f"[-] Warning: Failed to fetch options data for Pacifica {vin} (unreachable). Rejecting listing.", file=sys.stderr)
                 matches = False
@@ -428,6 +430,7 @@ def verify_car_options(car, profile, cache_dict):
             matches = has_moonroof and has_360_cam and is_7_pass
             if not matches:
                 print(f"[-] GH options missing on {vin}: Moonroof={has_moonroof}, 360Cam={has_360_cam}, 7Pass={is_7_pass}", file=sys.stderr)
+            cache_dict[vin] = matches
         else:
             print(f"[-] Warning: Failed to scrape VDP URL for Grand Highlander {vin} (unreachable). Rejecting listing.", file=sys.stderr)
             matches = False
@@ -441,11 +444,11 @@ def verify_car_options(car, profile, cache_dict):
             matches = has_tech and has_captains and has_levinson
             if not matches:
                 print(f"[-] Lexus TX options missing on {vin}: Tech={has_tech}, Captains={has_captains}, ML={has_levinson}", file=sys.stderr)
+            cache_dict[vin] = matches
         else:
             print(f"[-] Warning: Failed to scrape VDP URL for Lexus TX {vin} (unreachable). Rejecting listing.", file=sys.stderr)
             matches = False
             
-    cache_dict[vin] = matches
     return matches
 
 def main():
