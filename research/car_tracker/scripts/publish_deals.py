@@ -3,6 +3,7 @@ import sys
 import json
 import argparse
 import requests
+import time
 from dotenv import load_dotenv
 
 # Base coordinate for distance calculation (Yonkers, NY)
@@ -38,6 +39,7 @@ def get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root):
                         break
                     listings.extend(data)
                     offset += limit
+                    time.sleep(1.0) # sleep 1.0s between pages to stay under rate limits
                 else:
                     print(f"[-] Warning: Visor API request failed with status code {r.status_code}", file=sys.stderr)
                     break
@@ -208,7 +210,12 @@ def main():
     print("# Daily Car Market Bulletin (New Listings & Cheapest Deals)")
     print(f"*Report generated for Yonkers, NY coordinates. Target distance comparisons sorted by proximity.*")
     
+    first = True
     for target in monitored_trims:
+        if not first:
+            time.sleep(2.0)
+        first = False
+        
         make = target["make"]
         model = target["model"]
         trim = target["trim"]
