@@ -60,7 +60,7 @@ def test_404_maps_to_not_found(fake_env):
 
 @responses.activate
 def test_429_then_success_backoff(fake_env, monkeypatch):
-    monkeypatch.setattr("nyt_reader.client.time.sleep", lambda *_: None)
+    monkeypatch.setattr("news_reader_base.client.time.sleep", lambda *_: None)
     url_re = re.compile(r"https://samizdat-graphql\.nytimes\.com/.*")
     responses.add(responses.GET, url_re, body="slow", status=429)
     responses.add(responses.GET, url_re, json={"data": {"ok": True}}, status=200)

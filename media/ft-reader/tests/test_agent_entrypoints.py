@@ -1,4 +1,4 @@
-"""All three agent entrypoint files must exist and reference the four commands."""
+"""SKILL.md + AGENTS.md must exist and reference the four commands."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,12 +21,6 @@ def test_agents_md_documents_all_commands():
     text = _read("AGENTS.md")
     for cmd in COMMANDS:
         assert f"ft {cmd}" in text, f"AGENTS.md missing 'ft {cmd}'"
-
-
-def test_gemini_md_documents_all_commands():
-    text = _read("GEMINI.md")
-    for cmd in COMMANDS:
-        assert f"ft {cmd}" in text, f"GEMINI.md missing 'ft {cmd}'"
 
 
 def test_env_sample_lists_required_cookies():

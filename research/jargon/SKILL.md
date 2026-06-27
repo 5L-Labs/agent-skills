@@ -49,7 +49,9 @@ Read `references/jargon-registry.json` via skill_view(name='jargon', file_path='
 
 For each digest item (paper title/abstract, tweet, story headline):
 - Check if any registered term appears (case-insensitive match)
-- If found, note the term and include its definition LABELED with the education level: `🎒 [kindergarten] TERM = definition`
+- **Skip saturated terms**: if a term has `"saturated": true` in the registry, do NOT include it in the jargon output. These are baseline terms the audience already knows (e.g. LLM, SFT). They still count as "detected" for tracking purposes (update last_seen) but do not appear in the digest.
+- For non-saturated terms found, include the definition LABELED with the education level: `🎒 [kindergarten] TERM = definition`
+- Within a single digest, track which terms have already been explained and skip repeats. If LLM was explained in paper 1, don't re-explain it in paper 7.
 - Use kindergarten level for general-audience channels, high-school for technical channels, doctor for expert-only channels
 
 ### Step 3: Detect unknown jargon
@@ -68,7 +70,9 @@ For newly confirmed terms (verify with the user or infer from context):
 
 ## Output in Digests
 
-When jargon is detected in a digest item, append the plainspeak note with an education level label. For known terms:
+When jargon is detected in a digest item, append the plainspeak note with an education level label. Saturated terms (those the audience already knows) are suppressed — they never appear in output even if detected in the text. Within a single digest, each term is explained at most once (on first encounter).
+
+For known non-saturated terms:
 
 ```
 **Jargon:** 🎒 [kindergarten] DPO = teaching AI right from wrong by example. LLM = a smart computer brain that understands words.
@@ -86,10 +90,10 @@ Group multiple jargon notes on the same `**Jargon:**` line if many terms appear 
 
 - New terms are discovered during digest runs (Step 3)
 - The registry grows organically — there is no "complete" list
+- Terms marked `"saturated": true` are never displayed to the audience (suppressed from all digest output), but they remain in the registry for tracking. Mark common baseline terms as saturated when they appear so often that re-explaining them adds noise.
 - Periodically consolidate: if a term hasn't been seen in 90 days, flag for possible removal
 - First seen/last seen dates enable usage tracking over time
 
 ## Version History
 
-- 1.1.0 (2026-05-24): Step 2/3 output now includes education level labels (🎒 [kindergarten], 🆕 New term). Output format shows `**Jargon:**` line with labeled definitions for Discord markdown digests.
-- 1.0.0 (2026-05-24): Initial skill. JSON registry with plainspeak at doctor/high-school/kindergarten levels. Detection workflow for digest pipelines.
+- 1.2.0 (2026-06-14): Added saturation filter — terms marked `"saturated": true` are suppressed from digest output. Added per-digest deduplication to avoid re-explaining the same term across multiple papers in one run.

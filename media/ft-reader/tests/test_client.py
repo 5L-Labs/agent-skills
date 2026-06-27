@@ -58,7 +58,7 @@ def test_404_maps_to_not_found(fake_env):
 @responses.activate
 def test_429_then_success_backoff(fake_env, monkeypatch):
     # No real sleep in tests.
-    monkeypatch.setattr("ft_reader.client.time.sleep", lambda *_: None)
+    monkeypatch.setattr("news_reader_base.client.time.sleep", lambda *_: None)
     responses.add(
         responses.GET,
         "https://app-api.ft.com/slow",

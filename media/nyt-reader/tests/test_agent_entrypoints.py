@@ -23,12 +23,6 @@ def test_agents_md_documents_all_commands():
         assert f"nyt {cmd}" in text, f"AGENTS.md missing 'nyt {cmd}'"
 
 
-def test_gemini_md_documents_all_commands():
-    text = _read("GEMINI.md")
-    for cmd in COMMANDS:
-        assert f"nyt {cmd}" in text, f"GEMINI.md missing 'nyt {cmd}'"
-
-
 def test_env_sample_lists_required_cookies():
     text = _read(".env.sample")
     for key in ("NYT_A", "NYT_S", "NYT_JKIDD", "NYT_PURR", "NYT_B_SID"):

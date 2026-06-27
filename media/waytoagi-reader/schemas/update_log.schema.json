@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "waytoagi update-log output",
+  "description": "The CLI emits one of two shapes: a day-grouped tree (default) or a flat item list (--flatten). Both share schema_version + source_url + heading metadata.",
+  "type": "object",
+  "required": ["schema_version", "source_url"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source_url": {"type": "string"},
+    "heading": {"type": ["string", "null"]},
+    "heading_id": {"type": ["string", "null"]}
+  },
+  "oneOf": [
+    {
+      "title": "day-grouped output",
+      "required": ["found", "days"],
+      "properties": {
+        "found": {"type": "boolean"},
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heading": {"type": ["string", "null"]},
+              "heading_id": {"type": ["string", "null"]},
+              "month": {"type": ["string", "null"], "description": "Set only by archive output; the heading2 label this day falls under."},
+              "items": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/item"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "flat output (--flatten)",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {"$ref": "#/$defs/item"},
+              {
+                "properties": {
+                  "day": {"type": ["string", "null"], "description": "Source day heading text."},
+                  "day_heading_id": {"type": ["string", "null"]}
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "item": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "type": {"type": "string"},
+        "title": {"type": ["string", "null"]},
+        "url": {"type": ["string", "null"]},
+        "summary": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

@@ -23,12 +23,6 @@ def test_agents_md_documents_all_commands():
         assert f"wsj {cmd}" in text, f"AGENTS.md missing 'wsj {cmd}'"
 
 
-def test_gemini_md_documents_all_commands():
-    text = _read("GEMINI.md")
-    for cmd in COMMANDS:
-        assert f"wsj {cmd}" in text, f"GEMINI.md missing 'wsj {cmd}'"
-
-
 def test_env_sample_references_wsj_cookie():
     text = _read(".env.sample")
     assert "WSJ_COOKIE" in text

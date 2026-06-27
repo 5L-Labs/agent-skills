@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "news-reader-base"
+version = "0.1.0"
+description = "Shared base for the FT / NYT / WSJ reader skills: cache, HTTP client with backoff, CLI scaffold, and exit-code-bearing errors."
+license = {text = "Apache-2.0"}
+authors = [{name = "Nick Lange"}]
+requires-python = ">=3.10"
+dependencies = ["requests>=2.31"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "responses>=0.24"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

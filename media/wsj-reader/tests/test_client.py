@@ -87,7 +87,7 @@ def test_404_maps_to_not_found(fake_env):
 
 @responses.activate
 def test_429_then_success_backoff(fake_env, monkeypatch):
-    monkeypatch.setattr("wsj_reader.client.time.sleep", lambda *_: None)
+    monkeypatch.setattr("news_reader_base.client.time.sleep", lambda *_: None)
     url = "https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos"
     responses.add(responses.GET, url, body="too many", status=429)
     responses.add(responses.GET, url, json={"items": []}, status=200)
