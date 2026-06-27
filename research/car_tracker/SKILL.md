@@ -38,7 +38,7 @@ The tracker monitors target trims specified in `data/tracked_trims.json`. If thi
     "make": "Chrysler",
     "model": "Pacifica",
     "trim": "Pinnacle AWD",
-    "vin_prefix": "2C4RC"
+    "vin_prefix": "2C4RC3"
   }
 ]
 ```

@@ -188,7 +188,11 @@ def main():
                 monitored_trims = json.load(f)
         except Exception as e:
             print(f"[-] Error loading trims config: {e}. Using defaults.", file=sys.stderr)
-            monitored_trims = []
+            monitored_trims = [
+                {"make": "Toyota", "model": "Grand Highlander", "trim": "Hybrid MAX Platinum AWD", "vin_prefix": "5TDAD"},
+                {"make": "Chrysler", "model": "Pacifica", "trim": "Pinnacle AWD", "vin_prefix": "2C4RC3"},
+                {"make": "Lexus", "model": "TX", "trim": "350 AWD", "vin_prefix": "5TDAA"}
+            ]
     else:
         monitored_trims = [
             {"make": "Toyota", "model": "Grand Highlander", "trim": "Hybrid MAX Platinum AWD", "vin_prefix": "5TDAD"},
