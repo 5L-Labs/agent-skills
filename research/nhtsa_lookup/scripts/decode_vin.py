@@ -12,7 +12,11 @@ def decode_vin(vin):
     try:
         r = requests.get(url, timeout=10)
         if r.status_code == 200:
-            res = r.json().get("Results", [])[0]
+            results = r.json().get("Results", [])
+            if not results:
+                print(f"[-] Error: NHTSA API returned no results for VIN '{vin}'.", file=sys.stderr)
+                sys.exit(1)
+            res = results[0]
             err_code = res.get("ErrorCode", "0")
             err_text = res.get("ErrorText", "")
             
@@ -24,7 +28,7 @@ def decode_vin(vin):
         else:
             print(f"[-] Request failed with status code {r.status_code}", file=sys.stderr)
             sys.exit(1)
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"[-] Connection error: {e}", file=sys.stderr)
         sys.exit(1)
 
