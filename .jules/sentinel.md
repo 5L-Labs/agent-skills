@@ -7,3 +7,8 @@
 **Vulnerability:** The `_resolve` function in `devops/secret-store/scripts/secrets.py` directly appended user-provided secret names to the store path without validation, allowing directory traversal attacks (e.g., `../something`).
 **Learning:** Always resolve paths and check if they are relative to the intended base directory using `pathlib`'s `is_relative_to` method to prevent directory traversal. String prefix checks (`startswith`) are vulnerable to sibling directory traversal.
 **Prevention:** Use `resolved_path.is_relative_to(resolved_root)` for all user-provided file paths.
+
+## 2026-06-29 - [CRITICAL] SSRF Risk in MCP and Translate Tools
+**Vulnerability:** Several tools used `urllib.request.urlopen` without validating URL schemes, allowing potential `file://` scheme usage which leads to Server-Side Request Forgery and local file reads.
+**Learning:** Python's standard library `urllib` defaults to supporting multiple schemes, unlike `requests`. Explicit validation is required for arbitrary URLs.
+**Prevention:** Always validate URL schemes (e.g., `startswith("http://") or startswith("https://")`) before passing user or environment-provided URLs to `urllib.request.urlopen`.
