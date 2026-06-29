@@ -56,6 +56,17 @@ def call_mcp_tool(url, password, tool_name, arguments, insecure=False):
         req = urllib.request.Request(url, data=json.dumps(init_payload).encode(), headers=headers, method="POST")
         with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
             sid = r.headers.get("Mcp-Session-Id")
+            init_content_type = r.headers.get("Content-Type", "").lower()
+            init_body = r.read().decode()
+            
+            if "text/event-stream" in init_content_type:
+                data_lines = [line[5:].strip() for line in init_body.splitlines() if line.startswith("data:")]
+                init_body = "\n".join(data_lines)
+                
+            init_res = json.loads(init_body)
+            if "error" in init_res:
+                print(f"[-] MCP Initialization Error: {init_res['error']}", file=sys.stderr)
+                sys.exit(1)
             
         # Call tool
         if sid:
