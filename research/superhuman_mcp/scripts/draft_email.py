@@ -4,6 +4,7 @@ import json
 import argparse
 import urllib.request
 import urllib.error
+import urllib.parse
 
 def read_jsonrpc_response(r, req_id):
     content_type = r.headers.get("Content-Type", "").lower()
@@ -64,9 +65,14 @@ def call_mcp_tool(url, auth, tool_name, arguments):
     }
     
     try:
+        parsed_url = urllib.parse.urlparse(url)
+        if parsed_url.scheme not in ("http", "https"):
+            print(f"[-] Error: Invalid URL scheme '{parsed_url.scheme}'. Only 'http' or 'https' are allowed.", file=sys.stderr)
+            sys.exit(1)
+
         # Initialize
         req = urllib.request.Request(url, data=json.dumps(init_payload).encode(), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=15) as r:  # nosec B310
             sid = r.headers.get("Mcp-Session-Id")
             init_res = read_jsonrpc_response(r, 0)
             if "error" in init_res:
@@ -84,11 +90,11 @@ def call_mcp_tool(url, auth, tool_name, arguments):
             "params": {}
         }
         req_notif = urllib.request.Request(url, data=json.dumps(init_notif).encode(), headers=headers, method="POST")
-        with urllib.request.urlopen(req_notif, timeout=15) as r_notif:
+        with urllib.request.urlopen(req_notif, timeout=15) as r_notif:  # nosec B310
             r_notif.read()
             
         req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=15) as r:  # nosec B310
             res = read_jsonrpc_response(r, 1)
             if "error" in res:
                 print(f"[-] MCP Error: {res['error']}", file=sys.stderr)
