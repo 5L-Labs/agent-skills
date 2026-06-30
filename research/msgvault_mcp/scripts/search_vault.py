@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import argparse
+import urllib.parse
 import urllib.request
 import urllib.error
 import ssl
@@ -34,6 +35,9 @@ def read_jsonrpc_response(r, req_id):
     sys.exit(1)
 
 def call_mcp_tool(url, password, tool_name, arguments, insecure=False):
+    if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        raise ValueError(f"Invalid URL scheme in {url}")
+
     # Setup SSL Context based on --insecure CLI argument
     if insecure:
         ctx = ssl.create_default_context()
@@ -81,7 +85,7 @@ def call_mcp_tool(url, password, tool_name, arguments, insecure=False):
     try:
         # Initialize
         req = urllib.request.Request(url, data=json.dumps(init_payload).encode(), headers=headers, method="POST")
-        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:  # nosec B310
             sid = r.headers.get("Mcp-Session-Id")
             init_res = read_jsonrpc_response(r, 0)
             if "error" in init_res:
@@ -99,11 +103,11 @@ def call_mcp_tool(url, password, tool_name, arguments, insecure=False):
             "params": {}
         }
         req_notif = urllib.request.Request(url, data=json.dumps(init_notif).encode(), headers=headers, method="POST")
-        with urllib.request.urlopen(req_notif, context=ctx, timeout=15) as r_notif:
+        with urllib.request.urlopen(req_notif, context=ctx, timeout=15) as r_notif:  # nosec B310
             r_notif.read()
             
         req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method="POST")
-        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:  # nosec B310
             res = read_jsonrpc_response(r, 1)
             if "error" in res:
                 print(f"[-] MCP Error: {res['error']}", file=sys.stderr)
