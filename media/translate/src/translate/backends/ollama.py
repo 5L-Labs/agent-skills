@@ -9,6 +9,7 @@ import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -63,12 +64,16 @@ class OllamaBackend:
     def _post_with_retry(self, url: str, payload: dict) -> dict:
         for attempt in range(self.max_retries + 1):
             try:
+                parsed = urllib.parse.urlparse(url)
+                if parsed.scheme not in ("http", "https"):
+                    raise ValueError(f"Invalid URL scheme: {parsed.scheme}")
+
                 req = urllib.request.Request(
                     url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # nosec B310
                     return json.loads(resp.read())
             except Exception as exc:  # noqa: BLE001
                 if attempt >= self.max_retries or not _is_retryable(exc):
