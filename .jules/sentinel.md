@@ -7,3 +7,8 @@
 **Vulnerability:** The `_resolve` function in `devops/secret-store/scripts/secrets.py` directly appended user-provided secret names to the store path without validation, allowing directory traversal attacks (e.g., `../something`).
 **Learning:** Always resolve paths and check if they are relative to the intended base directory using `pathlib`'s `is_relative_to` method to prevent directory traversal. String prefix checks (`startswith`) are vulnerable to sibling directory traversal.
 **Prevention:** Use `resolved_path.is_relative_to(resolved_root)` for all user-provided file paths.
+
+## 2026-07-01 - [CRITICAL] SSRF / Local File Read via `urllib.request.urlopen`
+**Vulnerability:** The `OllamaBackend` in `media/translate/src/translate/backends/ollama.py` used `urllib.request.urlopen(req)` to make external requests based on dynamically constructed URLs without validating the URL scheme. An attacker could supply a `file:///` protocol URL, allowing unauthorized reading of local files.
+**Learning:** `urllib.request.urlopen` does not restrict protocols by default and will blindly follow `file://`, `ftp://`, etc. if provided, leading to Server-Side Request Forgery (SSRF) or arbitrary local file read (Bandit B310).
+**Prevention:** Always validate that URLs explicitly start with `http://` or `https://` before passing them to `urllib.request.urlopen` or similar standard library HTTP clients. Append `# nosec B310` to the validated line to silence bandit correctly.
