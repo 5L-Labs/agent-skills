@@ -7,3 +7,8 @@
 **Vulnerability:** The `_resolve` function in `devops/secret-store/scripts/secrets.py` directly appended user-provided secret names to the store path without validation, allowing directory traversal attacks (e.g., `../something`).
 **Learning:** Always resolve paths and check if they are relative to the intended base directory using `pathlib`'s `is_relative_to` method to prevent directory traversal. String prefix checks (`startswith`) are vulnerable to sibling directory traversal.
 **Prevention:** Use `resolved_path.is_relative_to(resolved_root)` for all user-provided file paths.
+
+## 2026-07-03 - [CRITICAL] SSRF Vulnerability in HTTP Clients
+**Vulnerability:** The HTTP client in `media/translate/src/translate/backends/ollama.py` used `urllib.request.urlopen` with user-controlled URLs without validating the scheme, allowing potential Server-Side Request Forgery (SSRF) and local file read access via `file://` or custom schemes.
+**Learning:** Standard library HTTP clients like `urllib.request.urlopen` will happily follow non-HTTP schemes (like `file://` or `ftp://`) if not restricted. This is a common pattern across the codebase's standalone scripts that interface with HTTP APIs.
+**Prevention:** Always explicitly validate the URL scheme (e.g., `url.lower().startswith(("http://", "https://"))`) before passing it to `urlopen` or similar clients, and use `# nosec B310` only after this validation is implemented.
