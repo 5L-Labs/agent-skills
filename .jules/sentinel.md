@@ -7,3 +7,8 @@
 **Vulnerability:** The `_resolve` function in `devops/secret-store/scripts/secrets.py` directly appended user-provided secret names to the store path without validation, allowing directory traversal attacks (e.g., `../something`).
 **Learning:** Always resolve paths and check if they are relative to the intended base directory using `pathlib`'s `is_relative_to` method to prevent directory traversal. String prefix checks (`startswith`) are vulnerable to sibling directory traversal.
 **Prevention:** Use `resolved_path.is_relative_to(resolved_root)` for all user-provided file paths.
+
+## 2026-07-04 - Fixed SSRF vulnerability in urllib urlopen calls
+**Vulnerability:** Found `urllib.request.urlopen` calls receiving user-provided or external URLs without explicitly checking if the URL scheme is HTTP/HTTPS. This can lead to SSRF and Local File Read vulnerabilities via `file://` or other schemes.
+**Learning:** Python's `urllib.request.urlopen` allows protocols beyond HTTP (e.g. `file://`). We need to proactively validate URLs against a whitelist of safe schemes.
+**Prevention:** Explicitly validate URL schemes when fetching remote resources (e.g., `url.lower().startswith(("http://", "https://"))`). Add `# nosec B310` only after careful validation.
