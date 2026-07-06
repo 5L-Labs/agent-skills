@@ -21,7 +21,12 @@ def get_distance(lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c * 1.18
 
-def get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root):
+def get_listings_for_trim(target, api_key, project_root):
+    make = target["make"]
+    model = target["model"]
+    trim = target["trim"]
+    vin_prefix = target.get("vin_prefix")
+    
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     listings = []
     limit = 100
@@ -47,21 +52,32 @@ def get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root):
                 print(f"[-] Warning: Visor API request failed with error: {e}", file=sys.stderr)
                 break
                 
-    # Filter by trim keywords & powertrain
+    # Filter by trim keywords, AWD, Hybrid, and powertrain prefix
     matching = []
-    trim_lower = trim.lower()
     
-    if "platinum" in trim_lower or "plat" in trim_lower:
-        filter_words = ["plat"]
-    elif "limited" in trim_lower or "ltd" in trim_lower:
-        filter_words = ["limit"]
-    elif "pinnacle" in trim_lower or "pinn" in trim_lower:
-        filter_words = ["pinn"]
-    elif "350" in trim_lower:
-        filter_words = ["350"]
-    else:
-        trim_words = trim_lower.split()
-        filter_words = [w for w in trim_words if w not in ["awd", "4wd", "hybrid", "max"]]
+    # Extract criteria from target configuration
+    req_keywords = target.get("required_trim_keywords")
+    if req_keywords is None:
+        trim_lower = trim.lower()
+        if "platinum" in trim_lower or "plat" in trim_lower:
+            req_keywords = ["plat"]
+        elif "limited" in trim_lower or "ltd" in trim_lower:
+            req_keywords = ["limit"]
+        elif "pinnacle" in trim_lower or "pinn" in trim_lower:
+            req_keywords = ["pinn"]
+        elif "350" in trim_lower:
+            req_keywords = ["350", "premium", "luxury", "base", "f sport", "f-sport"]
+        else:
+            trim_words = trim_lower.split()
+            req_keywords = [w for w in trim_words if w not in ["awd", "4wd", "hybrid", "max"]]
+            
+    requires_awd = target.get("requires_awd")
+    if requires_awd is None:
+        requires_awd = "awd" in trim.lower() or "4wd" in trim.lower() or "4x4" in trim.lower()
+        
+    requires_hybrid = target.get("requires_hybrid")
+    if requires_hybrid is None:
+        requires_hybrid = "hybrid" in trim.lower()
         
     for car in listings:
         car_trim = (car.get("trim") or "").lower()
@@ -86,12 +102,33 @@ def get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root):
             continue
             
         # Match trim keywords
-        if any(w in car_trim for w in filter_words):
-            lat = car.get("latitude")
-            lon = car.get("longitude")
-            dist = get_distance(lat, lon)
-            car["computed_distance"] = dist
-            matching.append(car)
+        listing_text = f"{model} {car_trim}".upper()
+        if req_keywords:
+            if not any(k.upper() in listing_text for k in req_keywords):
+                continue
+                
+        # Match AWD
+        if requires_awd:
+            is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
+            if not is_awd_flag:
+                vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
+                listing_text = f"{model} {car_trim} {vdp_url}".upper()
+                is_awd_flag = any(token in listing_text for token in ("AWD", "4WD", "4X4"))
+            if not is_awd_flag and car_vin.startswith("5TDAA") and len(car_vin) > 5:
+                is_awd_flag = (car_vin[5] == "B")
+            if not is_awd_flag:
+                continue
+                
+        # Match Hybrid
+        if requires_hybrid:
+            if "HYBRID" not in listing_text and not car_vin.startswith(("5TDAC", "5TDAD")):
+                continue
+                
+        lat = car.get("latitude")
+        lon = car.get("longitude")
+        dist = get_distance(lat, lon)
+        car["computed_distance"] = dist
+        matching.append(car)
             
     # Also load from saved file if API has fewer matches
     saved_path = os.path.join(project_root, "data", "comprehensive_search_results.json")
@@ -100,7 +137,7 @@ def get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root):
             with open(saved_path, "r") as f:
                 saved_data = json.load(f)
                 
-            # Flatten lists
+            # Flatten lists and search under all keys
             for key in saved_data:
                 for car in saved_data[key]:
                     car_make = car.get("make", "")
@@ -126,14 +163,37 @@ def get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root):
                     if car_type != "new":
                         continue
                         
-                    if any(w in car_trim for w in filter_words):
-                        lat = car.get("latitude")
-                        lon = car.get("longitude")
-                        dist = get_distance(lat, lon)
-                        car["computed_distance"] = dist
-                        # Prevent duplicate VINs
-                        if not any(x.get("vin") == car.get("vin") for x in matching):
-                            matching.append(car)
+                    # Match trim keywords
+                    listing_text = f"{model} {car_trim}".upper()
+                    if req_keywords:
+                        if not any(k.upper() in listing_text for k in req_keywords):
+                            continue
+                            
+                    # Match AWD
+                    if requires_awd:
+                        is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
+                        if not is_awd_flag:
+                            vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
+                            listing_text = f"{model} {car_trim} {vdp_url}".upper()
+                            is_awd_flag = any(token in listing_text for token in ("AWD", "4WD", "4X4"))
+                        if not is_awd_flag and car_vin.startswith("5TDAA") and len(car_vin) > 5:
+                            is_awd_flag = (car_vin[5] == "B")
+                        if not is_awd_flag:
+                            continue
+                            
+                    # Match Hybrid
+                    if requires_hybrid:
+                        if "HYBRID" not in listing_text and not car_vin.startswith(("5TDAC", "5TDAD")):
+                            continue
+                            
+                    lat = car.get("latitude")
+                    lon = car.get("longitude")
+                    dist = get_distance(lat, lon)
+                    car["computed_distance"] = dist
+                    
+                    # Prevent duplicate VINs
+                    if not any(x.get("vin") == car.get("vin") for x in matching):
+                        matching.append(car)
         except Exception as e:
             print(f"[-] Warning: Failed to load comprehensive_search_results.json: {e}", file=sys.stderr)
 
@@ -182,25 +242,38 @@ def main():
     parser.add_argument("--trims", type=str, help="Path to JSON config of trims to monitor")
     args = parser.parse_args()
     
-    # Load monitored trims
-    trims_path = args.trims or os.path.join(project_root, "data", "tracked_trims.json")
-    if os.path.exists(trims_path):
-        try:
-            with open(trims_path, "r") as f:
-                monitored_trims = json.load(f)
-        except Exception as e:
-            print(f"[-] Error loading trims config: {e}. Using defaults.", file=sys.stderr)
-            monitored_trims = [
-                {"make": "Toyota", "model": "Grand Highlander", "trim": "Hybrid MAX Platinum AWD", "vin_prefix": "5TDAD"},
-                {"make": "Chrysler", "model": "Pacifica", "trim": "Pinnacle AWD", "vin_prefix": "2C4RC3"},
-                {"make": "Lexus", "model": "TX", "trim": "350 AWD", "vin_prefix": "5TDAA"}
-            ]
-    else:
-        monitored_trims = [
-            {"make": "Toyota", "model": "Grand Highlander", "trim": "Hybrid MAX Platinum AWD", "vin_prefix": "5TDAD"},
-            {"make": "Chrysler", "model": "Pacifica", "trim": "Pinnacle AWD", "vin_prefix": "2C4RC3"},
-            {"make": "Lexus", "model": "TX", "trim": "350 AWD", "vin_prefix": "5TDAA"}
-        ]
+    # Load monitored trims/profiles from configuration file
+    trims_path = args.trims
+    if not trims_path:
+        for loc in [
+            os.path.join(project_root, "config", "target_profiles.json"),
+            os.path.join(project_root, "data", "target_profiles.json"),
+            os.path.join(project_root, "target_profiles.json"),
+            os.path.join(project_root, "data", "tracked_trims.json"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "target_profiles.json"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "target_profiles.json"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "target_profiles.json"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "tracked_trims.json")
+        ]:
+            if os.path.exists(loc):
+                trims_path = loc
+                break
+                
+    if not trims_path or not os.path.exists(trims_path):
+        print("[-] Error: Configuration file not found. Please create 'config/target_profiles.json' or supply --trims.", file=sys.stderr)
+        sys.exit(1)
+        
+    try:
+        with open(trims_path, "r") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                # Convert profile dict to list of profile targets
+                monitored_trims = list(data.values())
+            else:
+                monitored_trims = data
+    except Exception as e:
+        print(f"[-] Error loading config from {trims_path}: {e}", file=sys.stderr)
+        sys.exit(1)
         
     # State tracking
     state_path = os.path.join(project_root, "data", "seen_listings.json")
@@ -219,12 +292,11 @@ def main():
         make = target["make"]
         model = target["model"]
         trim = target["trim"]
-        vin_prefix = target.get("vin_prefix")
         
         print(f"\n## 🚙 {make} {model} ({trim})")
         
         # Get listings
-        listings = get_listings_for_trim(make, model, trim, vin_prefix, api_key, project_root)
+        listings = get_listings_for_trim(target, api_key, project_root)
         
         if not listings:
             print("*No active new inventory matching specifications found.*")
