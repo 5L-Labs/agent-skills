@@ -21,11 +21,61 @@ def get_distance(lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c * 1.18
 
+def car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid):
+    car_trim = (car.get("trim") or "").lower()
+    car_vin = (car.get("vin") or "").upper()
+    price = car.get("price")
+    car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
+    
+    if price is None or not car_vin:
+        return False
+        
+    # Powertrain matching
+    if vin_prefix and len(car_vin) > 9:
+        if make.lower() == "toyota" or make.lower() == "lexus":
+            if len(vin_prefix) > 4 and car_vin[3:5] != vin_prefix[3:5]:
+                return False
+        elif make.lower() == "chrysler":
+            if len(vin_prefix) > 5 and car_vin[5] != vin_prefix[5]:
+                return False
+                
+    # Condition matching (strictly new)
+    if car_type != "new":
+        return False
+        
+    # Match trim keywords
+    listing_text = f"{model} {car_trim}".upper()
+    if req_keywords:
+        if not any(k.upper() in listing_text for k in req_keywords):
+            return False
+            
+    # Match AWD
+    if requires_awd:
+        is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
+        if not is_awd_flag:
+            vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
+            awd_text = f"{model} {car_trim} {vdp_url}".upper()
+            is_awd_flag = any(token in awd_text for token in ("AWD", "4WD", "4X4"))
+        if not is_awd_flag and len(car_vin) > 6:
+            if car_vin.startswith(("5TDAA", "5TDAC", "5TDAD")):
+                is_awd_flag = (car_vin[6] == "B")
+        if not is_awd_flag:
+            return False
+            
+    # Match Hybrid
+    if requires_hybrid:
+        hybrid_text = f"{model} {car_trim}".upper()
+        is_hybrid_flag = "HYBRID" in hybrid_text or car_vin.startswith(("5TDAC", "5TDAD"))
+        if not is_hybrid_flag:
+            return False
+            
+    return True
+
 def get_listings_for_trim(target, api_key, project_root):
     make = target["make"]
     model = target["model"]
     trim = target["trim"]
-    vin_prefix = target.get("vin_prefix")
+    vin_prefix = target.get("vin_prefix") or target.get("sample_vin")
     
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     listings = []
@@ -66,7 +116,7 @@ def get_listings_for_trim(target, api_key, project_root):
         elif "pinnacle" in trim_lower or "pinn" in trim_lower:
             req_keywords = ["pinn"]
         elif "350" in trim_lower:
-            req_keywords = ["350", "premium", "luxury", "base", "f sport", "f-sport"]
+            req_keywords = ["350"]
         else:
             trim_words = trim_lower.split()
             req_keywords = [w for w in trim_words if w not in ["awd", "4wd", "hybrid", "max"]]
@@ -80,55 +130,12 @@ def get_listings_for_trim(target, api_key, project_root):
         requires_hybrid = "hybrid" in trim.lower()
         
     for car in listings:
-        car_trim = (car.get("trim") or "").lower()
-        car_vin = (car.get("vin") or "").upper()
-        price = car.get("price")
-        car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
-        
-        if price is None or not car_vin:
-            continue
-            
-        # Powertrain matching
-        if vin_prefix and len(car_vin) > 9:
-            if make.lower() == "toyota" or make.lower() == "lexus":
-                if len(vin_prefix) > 4 and car_vin[3:5] != vin_prefix[3:5]:
-                    continue
-            elif make.lower() == "chrysler":
-                if len(vin_prefix) > 5 and car_vin[5] != vin_prefix[5]:
-                    continue
-                    
-        # Condition matching (strictly brand-new)
-        if car_type != "new":
-            continue
-            
-        # Match trim keywords
-        listing_text = f"{model} {car_trim}".upper()
-        if req_keywords:
-            if not any(k.upper() in listing_text for k in req_keywords):
-                continue
-                
-        # Match AWD
-        if requires_awd:
-            is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
-            if not is_awd_flag:
-                vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
-                listing_text = f"{model} {car_trim} {vdp_url}".upper()
-                is_awd_flag = any(token in listing_text for token in ("AWD", "4WD", "4X4"))
-            if not is_awd_flag and car_vin.startswith("5TDAA") and len(car_vin) > 5:
-                is_awd_flag = (car_vin[5] == "B")
-            if not is_awd_flag:
-                continue
-                
-        # Match Hybrid
-        if requires_hybrid:
-            if "HYBRID" not in listing_text and not car_vin.startswith(("5TDAC", "5TDAD")):
-                continue
-                
-        lat = car.get("latitude")
-        lon = car.get("longitude")
-        dist = get_distance(lat, lon)
-        car["computed_distance"] = dist
-        matching.append(car)
+        if car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid):
+            lat = car.get("latitude")
+            lon = car.get("longitude")
+            dist = get_distance(lat, lon)
+            car["computed_distance"] = dist
+            matching.append(car)
             
     # Also load from saved file if API has fewer matches
     saved_path = os.path.join(project_root, "data", "comprehensive_search_results.json")
@@ -142,58 +149,18 @@ def get_listings_for_trim(target, api_key, project_root):
                 for car in saved_data[key]:
                     car_make = car.get("make", "")
                     car_model = car.get("model", "")
-                    car_trim = (car.get("trim") or "").lower()
-                    car_vin = (car.get("vin") or "").upper()
-                    car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
-                    price = car.get("price")
                     
-                    if price is None or car_make.lower() != make.lower() or model.lower() not in car_model.lower():
+                    if car_make.lower() != make.lower() or model.lower() not in car_model.lower():
                         continue
                         
-                    # Powertrain matching
-                    if vin_prefix and len(car_vin) > 9:
-                        if make.lower() == "toyota" or make.lower() == "lexus":
-                            if len(vin_prefix) > 4 and car_vin[3:5] != vin_prefix[3:5]:
-                                continue
-                        elif make.lower() == "chrysler":
-                            if len(vin_prefix) > 5 and car_vin[5] != vin_prefix[5]:
-                                continue
-                                
-                    # Condition matching
-                    if car_type != "new":
-                        continue
-                        
-                    # Match trim keywords
-                    listing_text = f"{model} {car_trim}".upper()
-                    if req_keywords:
-                        if not any(k.upper() in listing_text for k in req_keywords):
-                            continue
-                            
-                    # Match AWD
-                    if requires_awd:
-                        is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
-                        if not is_awd_flag:
-                            vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
-                            listing_text = f"{model} {car_trim} {vdp_url}".upper()
-                            is_awd_flag = any(token in listing_text for token in ("AWD", "4WD", "4X4"))
-                        if not is_awd_flag and car_vin.startswith("5TDAA") and len(car_vin) > 5:
-                            is_awd_flag = (car_vin[5] == "B")
-                        if not is_awd_flag:
-                            continue
-                            
-                    # Match Hybrid
-                    if requires_hybrid:
-                        if "HYBRID" not in listing_text and not car_vin.startswith(("5TDAC", "5TDAD")):
-                            continue
-                            
-                    lat = car.get("latitude")
-                    lon = car.get("longitude")
-                    dist = get_distance(lat, lon)
-                    car["computed_distance"] = dist
-                    
-                    # Prevent duplicate VINs
-                    if not any(x.get("vin") == car.get("vin") for x in matching):
-                        matching.append(car)
+                    if car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid):
+                        lat = car.get("latitude")
+                        lon = car.get("longitude")
+                        dist = get_distance(lat, lon)
+                        car["computed_distance"] = dist
+                        # Prevent duplicate VINs
+                        if not any(x.get("vin") == car.get("vin") for x in matching):
+                            matching.append(car)
         except Exception as e:
             print(f"[-] Warning: Failed to load comprehensive_search_results.json: {e}", file=sys.stderr)
 

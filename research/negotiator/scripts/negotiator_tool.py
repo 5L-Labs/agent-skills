@@ -36,9 +36,10 @@ def decode_vin_from_profiles(vin, profiles):
         if not sample:
             continue
         make = p.get("make", "")
-        # For Toyota/Lexus, match first 5 chars
+        # For Toyota/Lexus, match first 7 chars if sample is long enough, else 5
         if make.lower() in ["toyota", "lexus"]:
-            if vin.startswith(sample[:5]):
+            match_len = 7 if len(sample) >= 7 else 5
+            if vin.startswith(sample[:match_len]):
                 return p.get("make"), p.get("model"), p.get("trim"), p
         # For Chrysler, match first 6 chars
         elif make.lower() == "chrysler":
@@ -85,6 +86,95 @@ def calculate_travel(dist):
         return 50.0
     return 500.0
 
+def car_matches_profile(car, make, model, trim, target_vin=None, profile=None):
+    # Determine criteria from profile if available
+    if profile:
+        req_keywords = profile.get("required_trim_keywords")
+        requires_awd = profile.get("requires_awd")
+        requires_hybrid = profile.get("requires_hybrid")
+        target_powertrain = None
+        vin_prefix = profile.get("vin_prefix") or profile.get("sample_vin")
+        if vin_prefix:
+            if make.lower() in ["toyota", "lexus"] and len(vin_prefix) >= 5:
+                target_powertrain = vin_prefix[3:5]
+            elif make.lower() == "chrysler" and len(vin_prefix) >= 6:
+                target_powertrain = vin_prefix[5]
+    else:
+        req_keywords = None
+        trim_lower = trim.lower()
+        if "platinum" in trim_lower or "plat" in trim_lower:
+            req_keywords = ["plat"]
+        elif "limited" in trim_lower or "ltd" in trim_lower:
+            req_keywords = ["limit"]
+        elif "pinnacle" in trim_lower or "pinn" in trim_lower:
+            req_keywords = ["pinn"]
+        elif "350" in trim_lower:
+            req_keywords = ["350"]
+        else:
+            trim_words = trim_lower.split()
+            req_keywords = [w for w in trim_words if w not in ["awd", "4wd", "hybrid", "max"]]
+            
+        requires_awd = "awd" in trim_lower or "4wd" in trim_lower or "4x4" in trim_lower
+        requires_hybrid = "hybrid" in trim_lower
+        
+        target_powertrain = None
+        if target_vin:
+            target_vin = target_vin.upper()
+            if len(target_vin) > 9:
+                if make.lower() in ["toyota", "lexus"]:
+                    target_powertrain = target_vin[3:5]
+                elif make.lower() == "chrysler":
+                    target_powertrain = target_vin[5]
+                    
+    car_trim = (car.get("trim") or "").lower()
+    car_vin = (car.get("vin") or "").upper()
+    price = car.get("price")
+    car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
+    
+    if price is None or not car_vin:
+        return False
+        
+    # Powertrain matching
+    if target_powertrain and len(car_vin) > 9:
+        if make.lower() in ["toyota", "lexus"]:
+            if car_vin[3:5] != target_powertrain:
+                return False
+        elif make.lower() == "chrysler":
+            if car_vin[5] != target_powertrain:
+                return False
+                
+    # Condition matching (strictly new)
+    if car_type != "new":
+        return False
+        
+    # Match trim keywords
+    listing_text = f"{model} {car_trim}".upper()
+    if req_keywords:
+        if not any(k.upper() in listing_text for k in req_keywords):
+            return False
+            
+    # Match AWD
+    if requires_awd:
+        is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
+        if not is_awd_flag:
+            vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
+            awd_text = f"{model} {car_trim} {vdp_url}".upper()
+            is_awd_flag = any(token in awd_text for token in ("AWD", "4WD", "4X4"))
+        if not is_awd_flag and len(car_vin) > 6:
+            if car_vin.startswith(("5TDAA", "5TDAC", "5TDAD")):
+                is_awd_flag = (car_vin[6] == "B")
+        if not is_awd_flag:
+            return False
+            
+    # Match Hybrid
+    if requires_hybrid:
+        hybrid_text = f"{model} {car_trim}".upper()
+        is_hybrid_flag = "HYBRID" in hybrid_text or car_vin.startswith(("5TDAC", "5TDAD"))
+        if not is_hybrid_flag:
+            return False
+            
+    return True
+
 def get_cheapest_national(make, model, trim, api_key, target_vin=None, profile=None):
     # Query Visor API live for matching trim
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -111,97 +201,14 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None, profile=N
                 print(f"[-] Warning: Visor API request failed with error: {e}", file=sys.stderr)
                 break
             
-    # Determine criteria from profile if available
-    if profile:
-        req_keywords = profile.get("required_trim_keywords")
-        requires_awd = profile.get("requires_awd")
-        requires_hybrid = profile.get("requires_hybrid")
-        target_powertrain = None
-        vin_prefix = profile.get("vin_prefix") or profile.get("sample_vin")
-        if vin_prefix and len(vin_prefix) > 9:
-            if make.lower() in ["toyota", "lexus"]:
-                target_powertrain = vin_prefix[3:5]
-            elif make.lower() == "chrysler":
-                target_powertrain = vin_prefix[5]
-    else:
-        # Fallback to the original hardcoded matching logic
-        req_keywords = None
-        trim_lower = trim.lower()
-        if "platinum" in trim_lower or "plat" in trim_lower:
-            req_keywords = ["plat"]
-        elif "limited" in trim_lower or "ltd" in trim_lower:
-            req_keywords = ["limit"]
-        elif "pinnacle" in trim_lower or "pinn" in trim_lower:
-            req_keywords = ["pinn"]
-        elif "350" in trim_lower:
-            req_keywords = ["350"]
-        else:
-            trim_words = trim_lower.split()
-            req_keywords = [w for w in trim_words if w not in ["awd", "4wd", "hybrid", "max"]]
-            
-        requires_awd = "awd" in trim_lower or "4wd" in trim_lower or "4x4" in trim_lower
-        requires_hybrid = "hybrid" in trim_lower
-        
-        target_powertrain = None
-        if target_vin:
-            target_vin = target_vin.upper()
-            if len(target_vin) > 9:
-                if make.lower() in ["toyota", "lexus"]:
-                    target_powertrain = target_vin[3:5]
-                elif make.lower() == "chrysler":
-                    target_powertrain = target_vin[5]
-            
     matching = []
     for car in listings:
-        car_trim = (car.get("trim") or "").lower()
-        car_vin = (car.get("vin") or "").upper()
-        price = car.get("price")
-        car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
-        
-        if price is None or not car_vin:
-            continue
-            
-        # Powertrain matching
-        if target_powertrain and len(car_vin) > 9:
-            if make.lower() in ["toyota", "lexus"]:
-                if car_vin[3:5] != target_powertrain:
-                    continue
-            elif make.lower() == "chrysler":
-                if car_vin[5] != target_powertrain:
-                    continue
-                    
-        # Condition matching (strictly new)
-        if car_type != "new":
-            continue
-            
-        # Match trim keywords
-        listing_text = f"{model} {car_trim}".upper()
-        if req_keywords:
-            if not any(k.upper() in listing_text for k in req_keywords):
-                continue
-                
-        # Match AWD
-        if requires_awd:
-            is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
-            if not is_awd_flag:
-                vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
-                listing_text = f"{model} {car_trim} {vdp_url}".upper()
-                is_awd_flag = any(token in listing_text for token in ("AWD", "4WD", "4X4"))
-            if not is_awd_flag and car_vin.startswith("5TDAA") and len(car_vin) > 5:
-                is_awd_flag = (car_vin[5] == "B")
-            if not is_awd_flag:
-                continue
-                
-        # Match Hybrid
-        if requires_hybrid:
-            if "HYBRID" not in listing_text and not car_vin.startswith(("5TDAC", "5TDAD")):
-                continue
-                
-        lat = car.get("latitude")
-        lon = car.get("longitude")
-        dist = get_distance(lat, lon)
-        car["computed_distance"] = dist
-        matching.append(car)
+        if car_matches_profile(car, make, model, trim, target_vin=target_vin, profile=profile):
+            lat = car.get("latitude")
+            lon = car.get("longitude")
+            dist = get_distance(lat, lon)
+            car["computed_distance"] = dist
+            matching.append(car)
             
     # Also load from saved file if API has fewer matches
     project_root = os.getcwd()
@@ -225,57 +232,18 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None, profile=N
                 for car in saved_data[key]:
                     car_make = car.get("make", "")
                     car_model = car.get("model", "")
-                    car_trim = (car.get("trim") or "").lower()
-                    car_vin = (car.get("vin") or "").upper()
-                    car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
-                    price = car.get("price")
                     
-                    if price is None or car_make.lower() != make.lower() or model.lower() not in car_model.lower():
+                    if car_make.lower() != make.lower() or model.lower() not in car_model.lower():
                         continue
                         
-                    # Powertrain matching
-                    if target_powertrain and len(car_vin) > 9:
-                        if make.lower() in ["toyota", "lexus"]:
-                            if car_vin[3:5] != target_powertrain:
-                                continue
-                        elif make.lower() == "chrysler":
-                            if car_vin[5] != target_powertrain:
-                                continue
-                                
-                    # Condition matching
-                    if car_type != "new":
-                        continue
+                    if car_matches_profile(car, make, model, trim, target_vin=target_vin, profile=profile):
+                        lat = car.get("latitude")
+                        lon = car.get("longitude")
+                        dist = get_distance(lat, lon)
+                        car["computed_distance"] = dist
                         
-                    # Match trim keywords
-                    listing_text = f"{model} {car_trim}".upper()
-                    if req_keywords:
-                        if not any(k.upper() in listing_text for k in req_keywords):
-                            continue
-                            
-                    # Match AWD
-                    if requires_awd:
-                        is_awd_flag = car.get("is_awd") or (car.get("drivetrain") or "").upper() in ("AWD", "4WD", "4X4", "ALL-WHEEL DRIVE")
-                        if not is_awd_flag:
-                            vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
-                            listing_text = f"{model} {car_trim} {vdp_url}".upper()
-                            is_awd_flag = any(token in listing_text for token in ("AWD", "4WD", "4X4"))
-                        if not is_awd_flag and car_vin.startswith("5TDAA") and len(car_vin) > 5:
-                            is_awd_flag = (car_vin[5] == "B")
-                        if not is_awd_flag:
-                            continue
-                            
-                    # Match Hybrid
-                    if requires_hybrid:
-                        if "HYBRID" not in listing_text and not car_vin.startswith(("5TDAC", "5TDAD")):
-                            continue
-                            
-                    lat = car.get("latitude")
-                    lon = car.get("longitude")
-                    dist = get_distance(lat, lon)
-                    car["computed_distance"] = dist
-                    
-                    if not any(x.get("vin") == car.get("vin") for x in matching):
-                        matching.append(car)
+                        if not any(x.get("vin") == car.get("vin") for x in matching):
+                            matching.append(car)
         except Exception:
             pass
 
@@ -322,9 +290,11 @@ def main():
             os.path.join(project_root, "config", "target_profiles.json"),
             os.path.join(project_root, "data", "target_profiles.json"),
             os.path.join(project_root, "target_profiles.json"),
+            os.path.join(project_root, "data", "tracked_trims.json"),
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "target_profiles.json"),
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "target_profiles.json"),
-            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "target_profiles.json")
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "target_profiles.json"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "tracked_trims.json")
         ]:
             if os.path.exists(loc):
                 config_path = loc
@@ -337,7 +307,28 @@ def main():
         
     try:
         with open(config_path, "r") as f:
-            profiles = json.load(f)
+            data = json.load(f)
+            if isinstance(data, list):
+                # Convert list of profiles to a dict mapping keys/specs to profile
+                profiles = {}
+                for i, p in enumerate(data):
+                    base_key = p.get("key")
+                    if not base_key:
+                        make_model_trim = f"{p.get('make')}_{p.get('model')}_{p.get('trim')}".lower().replace(" ", "_")
+                        vin_pfx = (p.get("vin_prefix") or p.get("sample_vin") or "").lower()
+                        if vin_pfx:
+                            base_key = f"{make_model_trim}_{vin_pfx}"
+                        else:
+                            base_key = make_model_trim
+                    
+                    k = base_key
+                    suffix = 1
+                    while k in profiles:
+                        k = f"{base_key}_{suffix}"
+                        suffix += 1
+                    profiles[k] = p
+            else:
+                profiles = data
     except Exception as e:
         print(f"[-] Error loading config from {config_path}: {e}", file=sys.stderr)
         sys.exit(1)

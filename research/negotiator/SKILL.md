@@ -26,10 +26,10 @@ This skill requires the following Python libraries:
 
 ## How to Run
 
-Execute the tool via the project's virtualenv Python interpreter using absolute pathing:
+Execute the tool via Python:
 
 ```bash
-./venv/bin/python /Users/njl/dev/src/mkai/car_buying/.agents/skills/negotiator/scripts/negotiator_tool.py --price <QUOTED_PRICE> [ --vin <VIN> ] [ --make <MAKE> --model <MODEL> --trim <TRIM> ]
+python scripts/negotiator_tool.py --price <QUOTED_PRICE> [ --vin <VIN> ] [ --make <MAKE> --model <MODEL> --trim <TRIM> ]
 ```
 
 ### Parameters
