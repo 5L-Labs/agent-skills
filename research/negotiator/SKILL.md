@@ -1,31 +1,22 @@
 ---
 name: negotiator
-description: Calculates OTD pricing spreads, cheapest market benchmarks, and mobile-friendly negotiation bid tiers to assist in dealership negotiations.
-version: 1.0.0
-author: Antigravity Agent
-license: MIT
-metadata:
-  hermes:
-    tags: [negotiation, car-buying, auto-pricing, visor-api, extended-warranty]
+description: Calculates OTD pricing spreads, cheapest market benchmarks, and mobile-friendly negotiation bid tiers (midpoint, -10% below market) to assist in dealership negotiations.
 ---
 
 # Negotiator Skill
 
 This skill assists agents in running mobile-friendly pricing comparisons and negotiation target bid spreadsheets for target vehicles.
 
-## Purpose
-
+## When to Use
 Use this skill when the user provides a VIN or a specific quote for a vehicle (e.g. at a dealership with options) and wants to:
 1. Compare that price with other regional listings.
 2. Establish a clear negotiation gap against similar units.
 3. Compute midpoint (50% spread) and aggressive (10% below market) target bids for phone/email pitches.
-4. Access post-sale extended warranty contacts for Toyota, Lexus, and Chrysler vehicles.
 
 ## Setup & Credentials
 
 To run the negotiator tool, you need to configure the following environment variables or add them to your `.env` file:
-
-*   `VISOR.VIN_API_KEY` (or `VISOR_API_KEY`): Required. The bearer API token used to query the live Visor API (`https://api.visor.vin/v1/listings`) for real-time inventory listings.
+*   `VISOR.VIN_API_KEY` (or `VISOR_API_KEY`): Required. The bearer API token used to query the live Visor API for real-time inventory listings.
 
 ## Dependencies
 
@@ -50,16 +41,13 @@ python scripts/negotiator_tool.py --price <QUOTED_PRICE> [ --vin <VIN> ] [ --mak
 
 ## Example Output
 
-The script outputs three tables formatted to fit perfectly on mobile screens:
+The script outputs two tables formatted inside a markdown block that fit perfectly on mobile screens:
 
 1.  **Quote vs. Benchmarks**: Compares the quoted OTD against the cheapest comparable unit found in the database, and against our baseline target vehicles (Pacifica, Grand Highlander, Lexus TX).
-2.  **Negotiation Bid Targets**: Outlines specific regional and nationwide bid tiers:
+2.  **Negotiation Bid Targets**: Outlines specific, actionable price bids:
     *   **Midpoint (50% Spread)**: The halfway point between the dealer's quote and the cheapest market price.
     *   **Cheapest Market (100%)**: The lowest price listed in the market for this exact trim.
     *   **Aggressive (-10% Market)**: 10% below the cheapest market price, useful for low-balling or initiating a tough push.
-3.  **Top Cheapest Nationwide Deals**: Lists the top 10 cheapest comparable units nationwide, sorted by distance from Yonkers, NY, showing their OTD prices and delta price differences from the absolute cheapest model.
-
-It also conditionally appends **Post-Sale Factory Warranty Nuggets** at the bottom if the vehicle is a Toyota, Lexus, or Chrysler.
 
 ## Post-Sale Warranty (VSC) & Protection Contacts
 
@@ -82,3 +70,4 @@ For a Pacifica, purchase an official Mopar MaxCare plan (the highest tier compon
 *   **The Online Portal Option**: Zeigler Auto Group (chryslerfactoryplans.com).
     *   *Why they're famous*: Zeigler is a massive dealer group with an automated online checkout for official Mopar plans.
     *   *The trick*: Use online forum promo codes (often `PAYINFULL` or `DAMON`) to instantly cut an extra $300 to $500 off the quote.
+
