@@ -61,6 +61,9 @@ class OllamaBackend:
         return (body.get("message") or {}).get("content", "").strip()
 
     def _post_with_retry(self, url: str, payload: dict) -> dict:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
+
         for attempt in range(self.max_retries + 1):
             try:
                 req = urllib.request.Request(
@@ -68,7 +71,7 @@ class OllamaBackend:
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # nosec B310
                     return json.loads(resp.read())
             except Exception as exc:  # noqa: BLE001
                 if attempt >= self.max_retries or not _is_retryable(exc):
