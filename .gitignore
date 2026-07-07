@@ -18,6 +18,9 @@ __pycache__/
 .venv/
 venv/
 
+# Runtime state (never commit)
+**/seen_listings.json
+
 # Secrets
 *.env
 *.key
