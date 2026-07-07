@@ -12,3 +12,8 @@
 **Vulnerability:** Found `urllib.request.urlopen` calls receiving user-provided or external URLs without explicitly checking if the URL scheme is HTTP/HTTPS. This can lead to SSRF and Local File Read vulnerabilities via `file://` or other schemes.
 **Learning:** Python's `urllib.request.urlopen` allows protocols beyond HTTP (e.g. `file://`). We need to proactively validate URLs against a whitelist of safe schemes.
 **Prevention:** Explicitly validate URL schemes when fetching remote resources (e.g., `url.lower().startswith(("http://", "https://"))`). Add `# nosec B310` only after careful validation.
+
+## 2026-07-07 - [CRITICAL] SSRF vulnerability in opener.open calls
+**Vulnerability:** Found `urllib.request.build_opener().open()` calls receiving external URLs without explicit HTTP/HTTPS validation. This can lead to SSRF via `file://` or other schemes, similar to `urllib.request.urlopen`.
+**Learning:** Bandit currently has a blind spot and does not flag `opener.open()` for SSRF (B310). We must proactively audit for both `urlopen` and `opener.open` to prevent SSRF vulnerabilities.
+**Prevention:** Explicitly validate URL schemes when fetching remote resources using `opener.open()` (e.g., `url.lower().startswith(("http://", "https://"))`). Add `# nosec B310` only after careful validation.
