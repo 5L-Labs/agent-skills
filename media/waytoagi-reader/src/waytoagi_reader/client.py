@@ -34,6 +34,10 @@ def fetch_html(
     Retries up to `WAYTOAGI_MAX_RETRIES` (default 2) with exponential backoff on
     5xx / connection-class errors. A transient Feishu glitch shouldn't wedge the
     5-minute cache TTL on the user's next invocation."""
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme: {url}")
+
     ua = user_agent or os.environ.get("WAYTOAGI_USER_AGENT") or DEFAULT_UA
     retries = max_retries if max_retries is not None else int(os.environ.get("WAYTOAGI_MAX_RETRIES", "2"))
     for attempt in range(retries + 1):
@@ -41,7 +45,7 @@ def fetch_html(
             jar = http.cookiejar.CookieJar()
             opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
             opener.addheaders = [("User-Agent", ua), ("Accept-Language", "zh-CN,en;q=0.9")]
-            with opener.open(url, timeout=timeout) as resp:
+            with opener.open(url, timeout=timeout) as resp:  # nosec B310
                 return resp.read().decode("utf-8", errors="replace")
         except Exception as exc:  # noqa: BLE001
             if attempt >= retries or not _is_retryable(exc):
