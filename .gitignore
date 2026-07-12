@@ -20,6 +20,8 @@ venv/
 
 # Runtime state (never commit)
 **/seen_listings.json
+**/benchmark_prices.json
+**/benchmark_price.json
 
 # Secrets
 *.env
