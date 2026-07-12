@@ -17,3 +17,8 @@
 **Vulnerability:** Found `urllib.request.build_opener().open()` receiving external URLs without explicit HTTP/HTTPS scheme validation, leading to potential SSRF and Local File Read (e.g., `file://`).
 **Learning:** While `bandit` rule B310 correctly flags `urllib.request.urlopen()` for SSRF, it currently has a blind spot and does not flag `opener.open()` calls. We must manually audit for `opener.open()` in addition to standard `urlopen` usage.
 **Prevention:** Explicitly validate URL schemes when fetching remote resources via custom openers (e.g., `url.lower().startswith(("http://", "https://"))`). Add `# nosec B310` to indicate manual validation.
+
+## 2026-07-11 - [HIGH] Unencrypted transmission of credentials over HTTP
+**Vulnerability:** MCP client scripts (`research/msgvault_mcp/scripts/search_vault.py` and `research/superhuman_mcp/scripts/draft_email.py`) accepted user-provided URLs without enforcing HTTPS. If a user provided an `http://` URL, Bearer tokens and Basic Auth credentials would be sent in plaintext over the network.
+**Learning:** Local dev tools often default to accepting HTTP for ease of use (e.g., pointing to `http://localhost`). However, when these tools also accept remote URLs and attach sensitive auth headers, failing to restrict HTTP to loopback addresses creates a massive footgun for unencrypted credential leakage.
+**Prevention:** When sending sensitive authentication tokens, always parse the URL using `urllib.parse.urlparse` and enforce `scheme == "https"`, except when the hostname is explicitly a local loopback (`localhost`, `127.0.0.1`, `::1`) or the user explicitly passes an `--insecure` override.
