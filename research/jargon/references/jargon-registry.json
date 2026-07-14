@@ -207,21 +207,6 @@
       "last_seen": "2026-05-23",
       "seen_in": []
     },
-    "MoE": {
-      "theme": "AI & ML Research",
-      "sub_theme": "Models & Architectures",
-      "source_level": "doctor",
-      "plainspeak": {
-        "doctor": "Mixture of experts — a neural network architecture where different 'expert' subnetworks activate for different inputs, selected by a sparse gating mechanism",
-        "high-school": "Using many specialized sub-models where only the relevant ones activate for each task, saving compute",
-        "kindergarten": "Like having a team of specialists where only the right expert answers each question"
-      },
-      "first_seen": "2026-05-23",
-      "last_seen": "2026-05-25",
-      "seen_in": [
-        "arxiv:cs.CL"
-      ]
-    },
     "MCP": {
       "theme": "Developer Tools & Infrastructure",
       "source_level": "doctor",
@@ -264,17 +249,126 @@
       "theme": "AI & ML Research",
       "sub_theme": "Models & Architectures",
       "source_level": "high-school",
+      "saturated": true,
       "plainspeak": {
         "doctor": "Large language model -- a neural network with billions of parameters trained on vast text corpora to generate and understand human language",
         "high-school": "A large AI model trained on text that can read, write, reason, and follow instructions",
         "kindergarten": "A smart computer brain that understands words"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-25",
+      "last_seen": "2026-07-14",
       "seen_in": [
         "arxiv:cs.CL",
         "hn-brief:2026-05-23",
-        "hn-brief:weekly-2026-W21"
+        "hn-brief:weekly-2026-W21",
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "GGUF": {
+      "theme": "Developer Tools & Infrastructure",
+      "source_level": "high-school",
+      "saturated": false,
+      "plainspeak": {
+        "doctor": "GPT-Generated Unified Format — a binary file format for storing quantized LLM weights, metadata, and tokenizer data, designed for llama.cpp and its ecosystem for efficient local inference on consumer hardware",
+        "high-school": "A file format for storing compressed AI model weights, used by local inference tools like llama.cpp to run models on consumer GPUs with reduced memory usage",
+        "kindergarten": "A zipped file for AI brains that lets them run on regular computers instead of giant server rooms"
+      },
+      "first_seen": "2026-07-14",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "vLLM": {
+      "theme": "Developer Tools & Infrastructure",
+      "source_level": "high-school",
+      "saturated": false,
+      "plainspeak": {
+        "doctor": "Virtual Large Language Model — a high-throughput, memory-efficient inference serving system that uses PagedAttention to manage KV cache memory, enabling near-zero waste and high concurrency for LLM serving",
+        "high-school": "A high-speed engine for running LLMs that efficiently manages memory to serve many users simultaneously with fast response times",
+        "kindergarten": "A fast engine that runs AI chatbots for lots of people at once without running out of memory"
+      },
+      "first_seen": "2026-07-14",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "SWE": {
+      "theme": "Developer Tools & Infrastructure",
+      "source_level": "high-school",
+      "saturated": false,
+      "plainspeak": {
+        "doctor": "Software engineering — the systematic application of engineering principles to the design, development, testing, and maintenance of software systems at scale",
+        "high-school": "The practice of building and maintaining software using established engineering methods, tools, and workflows",
+        "kindergarten": "The craft of building software the right way — planning, coding, testing, and fixing"
+      },
+      "first_seen": "2026-07-14",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "VRAM": {
+      "theme": "Hardware & IoT",
+      "source_level": "high-school",
+      "saturated": false,
+      "plainspeak": {
+        "doctor": "Video random-access memory — a dedicated type of DRAM integrated into graphics processing units, optimized for high-bandwidth parallel access patterns required for rendering and compute workloads including neural network inference",
+        "high-school": "The dedicated memory built into graphics cards that stores textures, frame buffers, and AI model weights for fast GPU processing",
+        "kindergarten": "The short-term memory inside your graphics card that the AI uses to do its thinking"
+      },
+      "first_seen": "2026-07-14",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "ZDR": {
+      "theme": "Security & Privacy",
+      "source_level": "high-school",
+      "saturated": false,
+      "plainspeak": {
+        "doctor": "Zero data retention — a privacy assurance model where the service provider commits to not storing user data (prompts, outputs, traces, code) beyond the minimum window required to process the request",
+        "high-school": "A privacy promise where the AI provider does not keep any record of your conversations, code, or data after responding to your request",
+        "kindergarten": "The AI forgets everything you told it right after answering, like talking to someone with no memory"
+      },
+      "first_seen": "2026-07-14",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "CUDA": {
+      "theme": "Developer Tools & Infrastructure",
+      "source_level": "high-school",
+      "saturated": true,
+      "plainspeak": {
+        "doctor": "Compute Unified Device Architecture — NVIDIA's parallel computing platform and programming model that enables general-purpose computing on GPUs through C/C++, Python, and other language extensions",
+        "high-school": "NVIDIA's platform for running general-purpose programs on graphics cards, massively accelerating AI, scientific, and video workloads",
+        "kindergarten": "NVIDIA's magic sauce that lets regular programs use the graphics card's super-fast brain for thinking"
+      },
+      "first_seen": "2026-07-14",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "smol-ai:2026-07-14"
+      ]
+    },
+    "MoE": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "doctor",
+      "saturated": true,
+      "plainspeak": {
+        "doctor": "Mixture of experts — a neural network architecture where different 'expert' subnetworks activate for different inputs, selected by a sparse gating mechanism",
+        "high-school": "Using many specialized sub-models where only the relevant ones activate for each task, saving compute",
+        "kindergarten": "Like having a team of specialists where only the right expert answers each question"
+      },
+      "first_seen": "2026-05-23",
+      "last_seen": "2026-07-14",
+      "seen_in": [
+        "arxiv:cs.CL",
+        "smol-ai:2026-07-14"
       ]
     },
     "VLN": {
