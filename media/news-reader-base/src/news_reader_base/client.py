@@ -113,6 +113,8 @@ class BaseClient:
         headers: Optional[dict] = None,
         space: bool = True,
     ) -> Any:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
         self._check_budget()
         if space:
             self._space()
@@ -155,6 +157,8 @@ class BaseClient:
         headers: Optional[dict] = None,
         space: bool = True,
     ) -> bytes:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
         self._check_budget()
         if space:
             self._space()
