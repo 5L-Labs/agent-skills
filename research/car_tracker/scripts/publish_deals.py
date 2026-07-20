@@ -22,37 +22,44 @@ def get_distance(lat2, lon2):
     return R * c * 1.18
 
 def extract_color(car):
-    """Best-effort extraction of paint color from the listing VDP URL and details."""
-    text = (car.get("vdp_url") or car.get("vdpUrl") or "").lower()
-    trim = (car.get("trim") or "").lower()
+    """Best-effort extraction of paint color from listing properties, URL, and VDP HTML."""
+    # 1. Check direct listing attributes first
+    for k in ["exterior_color", "exteriorColor", "color", "paint"]:
+        val = car.get(k)
+        if val and isinstance(val, str) and val.strip() and val.strip().upper() != "TBD":
+            return val.strip()
+            
+    vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
+    trim = car.get("trim") or ""
+    desc = car.get("description") or car.get("title") or car.get("name") or ""
+    text = f"{vdp_url} {trim} {desc}".lower()
     
     color_map = {
+        "storm cloud": "Storm Cloud",
+        "storm-cloud": "Storm Cloud",
         "wind chill": "Wind Chill Pearl",
         "wind-chill": "Wind Chill Pearl",
+        "nightfall": "Nightfall Mica",
+        "nightfall-mica": "Nightfall Mica",
         "cloudburst": "Cloudburst Gray",
-        "caviar": "Caviar Black",
-        "eminent white": "Eminent White Pearl",
-        "eminent-white": "Eminent White Pearl",
-        "nightshade": "Midnight Black (Nightshade)",
-        "blueprint": "Blueprint Blue",
-        "supersonic red": "Supersonic Red",
-        "supersonic-red": "Supersonic Red",
-        "velvet red": "Velvet Red Pearl",
-        "velvet-red": "Velvet Red Pearl",
-        "fathom blue": "Fathom Blue Pearl",
-        "fathom-blue": "Fathom Blue Pearl",
-        "bright white": "Bright White Clearcoat",
-        "bright-white": "Bright White Clearcoat",
-        "granite crystal": "Granite Crystal Metallic",
-        "granite-crystal": "Granite Crystal Metallic",
-        "storm cloud": "Storm Cloud Gray",
-        "storm-cloud": "Storm Cloud Gray",
-        "silver sterling": "Silver Sterling Metallic",
-        "silver-sterling": "Silver Sterling Metallic",
-        "celestial silver": "Celestial Silver Metallic",
-        "celestial-silver": "Celestial Silver Metallic",
-        "midnight black": "Midnight Black Metallic",
-        "midnight-black": "Midnight Black Metallic",
+        "cloudburst-gray": "Cloudburst Gray",
+        "heavy metal": "Heavy Metal",
+        "heavy-metal": "Heavy Metal",
+        "diamond black": "Diamond Black",
+        "diamond-black": "Diamond Black",
+        "bright white": "Bright White",
+        "bright-white": "Bright White",
+        "baltic gray": "Baltic Gray",
+        "baltic-gray": "Baltic Gray",
+        "fathom blue": "Fathom Blue",
+        "fathom-blue": "Fathom Blue",
+        "velvet red": "Velvet Red",
+        "velvet-red": "Velvet Red",
+        "caviar": "Caviar",
+        "cement": "Cement",
+        "blueprint": "Blueprint",
+        "incognito": "Incognito",
+        "iridium": "Iridium",
         "supersonic": "Supersonic Red",
         "supersonicred": "Supersonic Red",
         "white": "White",
@@ -66,8 +73,21 @@ def extract_color(car):
     }
     
     for key, val in color_map.items():
-        if key in text or key in trim:
+        if key in text:
             return val
+            
+    # 2. VDP HTML parsing fallback if URL is valid
+    if vdp_url and vdp_url.startswith("http"):
+        try:
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
+            r = requests.get(vdp_url, headers=headers, timeout=3)
+            if r.status_code == 200:
+                html = r.text.lower()
+                for key, val in color_map.items():
+                    if key in html:
+                        return val
+        except Exception:
+            pass
             
     return "TBD"
 
@@ -188,28 +208,17 @@ def get_msrp_info(car, api_key):
     return msrp
 
 def abbreviate_color(color_name):
-    if not color_name:
+    if not color_name or color_name.strip().upper() == "TBD":
         return "TBD"
-    c = color_name.upper().strip()
-    if "WIND CHILL" in c or "PEARL" in c:
-        return "Pearl"
-    if "BLACK" in c or "CAVIAR" in c:
-        return "Black"
-    if "SILVER" in c:
-        return "Silver"
-    if "STORM" in c:
-        return "Storm"
-    if "CEMENT" in c:
-        return "Cement"
-    if "BLUE" in c:
-        return "Blue"
-    if "RED" in c or "RUBY" in c or "MATADOR" in c:
-        return "Red"
-    if "GRAY" in c or "GREY" in c or "INCOGNITO" in c or "CLOUDBURST" in c:
-        return "Gray"
-    if "WHITE" in c:
-        return "White"
-    return color_name[:8]
+    import re
+    cleaned = re.sub(r'[^\w\s]', ' ', color_name)
+    words = [w.strip() for w in cleaned.split() if w.strip()]
+    if not words:
+        return "TBD"
+    if len(words) == 1:
+        return words[0][:6].capitalize()
+    else:
+        return "".join(w[:3].capitalize() for w in words)
 
 def get_features_summary(car, make, model, api_key):
     vin = car.get("vin")
@@ -325,14 +334,23 @@ def get_features_summary(car, make, model, api_key):
         
     return features_str
 
-def car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid):
+def car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid, target_year=None):
     car_trim = (car.get("trim") or "").lower()
     car_vin = (car.get("vin") or "").upper()
     price = car.get("price")
     car_type = (car.get("inventory_type", car.get("inventoryType", "used")) or "used").lower()
+    car_year = car.get("year")
     
     if price is None or not car_vin:
         return False
+
+    # Model year matching
+    if target_year and car_year:
+        try:
+            if int(car_year) != int(target_year):
+                return False
+        except (ValueError, TypeError):
+            pass
         
     # Powertrain matching
     if vin_prefix and len(car_vin) > 9:
@@ -433,8 +451,10 @@ def get_listings_for_trim(target, api_key, project_root):
     if requires_hybrid is None:
         requires_hybrid = "hybrid" in trim.lower()
         
+    target_year = target.get("year")
+        
     for car in listings:
-        if car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid):
+        if car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requires_awd, requires_hybrid, target_year):
             lat = car.get("latitude")
             lon = car.get("longitude")
             dist = get_distance(lat, lon)
@@ -685,7 +705,7 @@ def main():
                 new_seen_vins.add(vin)
                 
         # Print New Arrivals (sorted by distance)
-        print("\n### 🆕 New Arrivals in the Last 24 Hours")
+        print("\n### 🆕 New Arrivals (Since Last Check)")
         if new_arrivals:
             new_arrivals.sort(key=lambda x: x.get("computed_distance", float('inf')))
             print(f"| {'Loc / Dist':<15} | {'Price (% off MSRP)':<20} | {'Delta':<8} | {'Color':<10} | {'Features (C/O)':<16} | {'Visor Link':<12} | {'Dealer Site':<12} |")
