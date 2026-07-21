@@ -140,11 +140,14 @@ class NYTClient(BaseClient):
         return self.get_json(url, headers=self._graphql_headers(), space=space)
 
     def get_html(self, url: str, *, space: bool = True) -> str:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
+
         self._check_budget()
         if space:
             self._space()
         try:
-            r = self.session.get(url, headers=self._html_headers(), timeout=30)
+            r = self.session.get(url, headers=self._html_headers(), timeout=30)  # nosec B310
         except requests.RequestException as e:
             raise UpstreamError(f"network error for {url}: {e}") from e
         self._fetch_count += 1

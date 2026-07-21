@@ -309,6 +309,9 @@ def _probe_cdn(
 
 def _probe_one(client: WSJClient, url: str) -> tuple[int, Optional[int]]:
     """Range-request the first 8 bytes; return (status, total_size_or_None)."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme: {url}")
+
     try:
         # Lean directly on requests so we can capture Content-Range without
         # going through our normal _raise_for_status path (which would treat
@@ -320,7 +323,7 @@ def _probe_one(client: WSJClient, url: str) -> tuple[int, Optional[int]]:
                 "Range": "bytes=0-7",
             },
             timeout=15,
-        )
+        )  # nosec B310
         client._fetch_count += 1
         if r.status_code == 206:
             cr = r.headers.get("Content-Range", "")

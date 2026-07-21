@@ -113,6 +113,9 @@ class BaseClient:
         headers: Optional[dict] = None,
         space: bool = True,
     ) -> Any:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
+
         self._check_budget()
         if space:
             self._space()
@@ -120,7 +123,7 @@ class BaseClient:
         h = headers if headers is not None else self._headers()
         for attempt in range(4):
             try:
-                r = self.session.get(url, headers=h, timeout=30)
+                r = self.session.get(url, headers=h, timeout=30)  # nosec B310
             except requests.RequestException as e:
                 raise self._Upstream(f"network error for {url}: {e}") from e
             self._fetch_count += 1
@@ -155,12 +158,15 @@ class BaseClient:
         headers: Optional[dict] = None,
         space: bool = True,
     ) -> bytes:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
+
         self._check_budget()
         if space:
             self._space()
         h = headers if headers is not None else {"User-Agent": self.user_agent}
         try:
-            r = self.session.get(url, headers=h, timeout=60)
+            r = self.session.get(url, headers=h, timeout=60)  # nosec B310
         except requests.RequestException as e:
             raise self._Upstream(f"network error for {url}: {e}") from e
         self._fetch_count += 1
