@@ -22,3 +22,8 @@
 **Vulnerability:** MCP client scripts (`research/msgvault_mcp/scripts/search_vault.py` and `research/superhuman_mcp/scripts/draft_email.py`) accepted user-provided URLs without enforcing HTTPS. If a user provided an `http://` URL, Bearer tokens and Basic Auth credentials would be sent in plaintext over the network.
 **Learning:** Local dev tools often default to accepting HTTP for ease of use (e.g., pointing to `http://localhost`). However, when these tools also accept remote URLs and attach sensitive auth headers, failing to restrict HTTP to loopback addresses creates a massive footgun for unencrypted credential leakage.
 **Prevention:** When sending sensitive authentication tokens, always parse the URL using `urllib.parse.urlparse` and enforce `scheme == "https"`, except when the hostname is explicitly a local loopback (`localhost`, `127.0.0.1`, `::1`) or the user explicitly passes an `--insecure` override.
+
+## 2026-07-22 - [HIGH] Bandit blind spot for SSRF in requests module calls
+**Vulnerability:** Found `requests.Session().get()` and `requests.get()` receiving user-provided or external URLs without explicit HTTP/HTTPS scheme validation, leading to potential SSRF and Local File Read (e.g., via `file://`).
+**Learning:** While `bandit` rule B310 flags `urllib.request.urlopen()` for SSRF, it may miss `requests` usage and `opener.open()` calls for similar SSRF vulnerabilities. We must manually audit for `requests.get()` and `session.get()` in addition to standard usage.
+**Prevention:** When sending requests to URLs, always explicitly check `url.lower().startswith(("http://", "https://"))` and explicitly allow local loopback addresses (`localhost`, `127.0.0.1`, `::1`) if local dev is needed.
