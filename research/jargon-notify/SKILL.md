@@ -69,12 +69,18 @@ If the state file doesn't exist (first run), create it with an empty posted_term
 ### Step 2: Diff
 
 ```python
+import json, os
 registry_terms = set(registry["terms"].keys())
 posted_terms = set(state["posted_terms"].keys())
-new_terms = registry_terms - posted_terms
+# Exclude terms the user has marked as known (jargon-blocklist.json)
+blocklist_path = "/opt/data/skills/research/jargon/references/jargon-blocklist.json"
+blocked = set()
+if os.path.exists(blocklist_path):
+    blocked = set(json.load(open(blocklist_path)).get("blocked_terms", []))
+new_terms = (registry_terms - posted_terms) - blocked
 ```
 
-If no new terms: [SILENT] — do nothing, do not send any message. Exit.
+If no new terms: [SILENT] — do nothing, do not send any message. Exit. (Blocked terms in jargon-blocklist.json are excluded from new_terms even when absent from state.)
 
 ### Step 3: Post new terms to Discord
 
@@ -93,9 +99,13 @@ Example:
 🆕 New jargon: **VPO** — Vector Policy Optimization — Teaching AI to come up with lots of different good ideas instead of just one
 ```
 
-Post using `send_message` to target: `discord:1515190329832374272`
+Post using the Hermes CLI — there is no in-tool `send_message` available in cron/headless mode:
 
-Group all new terms into a single message (one term per line). If more than 10 new terms, split into multiple messages.
+```bash
+hermes send --to discord:jargon-watch "🆕 New jargon: **TERM** — Full Name — kindergarten-level explanation"
+```
+
+Channel `discord:jargon-watch` resolves to `discord:1515190329832374272`. Group all new terms into a single message (one term per line). If more than 10 new terms, split into multiple messages. Check the command exit code (0 = delivered) before marking terms as posted.
 
 ### Step 4: Update state file
 
