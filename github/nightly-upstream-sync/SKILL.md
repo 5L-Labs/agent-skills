@@ -109,6 +109,7 @@ Deliver: origin (to current chat)
 - **Only `/opt/data/skills/` is synced**, NOT `/opt/data/scripts/`. The nightly sync walks the skills directory only. Scripts (xapi.py, xdigest_fetch.py, nightly-repo-sync.py itself) live outside the skills tree and are NOT in any repo. They exist only on local disk and must be backed up separately.
 - **Auto-merge can fail silently for weeks.** Check auto-merge workflow runs periodically. If there are 10+ open PRs backed up, the auto-merge workflow is broken. See `github-auto-merge-workflow` skill's Known Failure Modes and Recovery sections.
 - **PRs are created but never merged if auto-merge fails.** Each nightly run creates a new branch and PR — they pile up. Clearing up 10+ stale PRs requires manual merge: `gh pr merge PR_NUMBER --squash --delete-branch` for each one that has passing CI.
+- **`git reset --hard origin/main` on agent-skills wipes unpushed local `main` commits every night.** `process_skills()` runs `git checkout main` then `git reset --hard origin/main` — so any commit sitting on local `main` that was never pushed gets orphaned from history at 03:00 UTC and eventually GC'd. If you commit directly to `main` (e.g. skill doc fixes), either push before the nightly run or `git branch backup/<name>` locally first. The nightly PR path (`update/local-TODAY`) is the intended route; direct `main` commits are not durable.
 
 ## Script Location
 
