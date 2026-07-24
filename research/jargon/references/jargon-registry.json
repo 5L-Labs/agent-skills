@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_updated": "2026-05-25T08:00:00Z",
+  "last_updated": "2026-07-24T08:00:00Z",
   "terms": {
     "BERT": {
       "theme": "AI & ML Research",
@@ -132,9 +132,10 @@
         "kindergarten": "Letting the AI look things up in a library before answering, instead of relying only on what it memorized"
       },
       "first_seen": "2026-05-24",
-      "last_seen": "2026-05-24",
+      "last_seen": "2026-07-22",
       "seen_in": [
-        "arxiv:cs.CL"
+        "arxiv:cs.CL",
+        "smol-ai:2026-07-22"
       ]
     },
     "SER": {
@@ -189,7 +190,7 @@
         "kindergarten": "Teaching AI by letting it see many answers and picking the best groups"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-24",
+      "last_seen": "2026-07-23",
       "seen_in": [
         "arxiv:cs.CL"
       ]
@@ -216,8 +217,10 @@
         "kindergarten": "A universal plug for AI to use real-world tools"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-23",
-      "seen_in": []
+      "last_seen": "2026-07-22",
+      "seen_in": [
+        "smol-ai:2026-07-22"
+      ]
     },
     "SFT": {
       "theme": "AI & ML Research",
@@ -242,8 +245,10 @@
         "kindergarten": "Sticking a small custom module onto an AI instead of rebuilding it from scratch"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-23",
-      "seen_in": []
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
     },
     "LLM": {
       "theme": "AI & ML Research",
@@ -274,9 +279,10 @@
         "kindergarten": "A zipped file for AI brains that lets them run on regular computers instead of giant server rooms"
       },
       "first_seen": "2026-07-14",
-      "last_seen": "2026-07-14",
+      "last_seen": "2026-07-22",
       "seen_in": [
-        "smol-ai:2026-07-14"
+        "smol-ai:2026-07-14",
+        "smol-ai:2026-07-22"
       ]
     },
     "vLLM": {
@@ -289,9 +295,10 @@
         "kindergarten": "A fast engine that runs AI chatbots for lots of people at once without running out of memory"
       },
       "first_seen": "2026-07-14",
-      "last_seen": "2026-07-14",
+      "last_seen": "2026-07-22",
       "seen_in": [
-        "smol-ai:2026-07-14"
+        "smol-ai:2026-07-14",
+        "smol-ai:2026-07-22"
       ]
     },
     "SWE": {
@@ -304,9 +311,10 @@
         "kindergarten": "The craft of building software the right way — planning, coding, testing, and fixing"
       },
       "first_seen": "2026-07-14",
-      "last_seen": "2026-07-14",
+      "last_seen": "2026-07-22",
       "seen_in": [
-        "smol-ai:2026-07-14"
+        "smol-ai:2026-07-14",
+        "smol-ai:2026-07-22"
       ]
     },
     "VRAM": {
@@ -319,9 +327,10 @@
         "kindergarten": "The short-term memory inside your graphics card that the AI uses to do its thinking"
       },
       "first_seen": "2026-07-14",
-      "last_seen": "2026-07-14",
+      "last_seen": "2026-07-22",
       "seen_in": [
-        "smol-ai:2026-07-14"
+        "smol-ai:2026-07-14",
+        "smol-ai:2026-07-22"
       ]
     },
     "ZDR": {
@@ -406,10 +415,11 @@
         "kindergarten": "A computer reading printed words and turning them into editable text"
       },
       "first_seen": "2026-05-23",
-      "last_seen": "2026-05-24",
+      "last_seen": "2026-07-22",
       "seen_in": [
         "hn-brief:2026-05-23",
-        "hn-brief:weekly-2026-W21"
+        "hn-brief:weekly-2026-W21",
+        "smol-ai:2026-07-22"
       ]
     },
     "BASIC": {
@@ -452,7 +462,7 @@
         "kindergarten": "A computer brain that's trained to understand images and the words that describe them"
       },
       "first_seen": "2026-05-25",
-      "last_seen": "2026-05-25",
+      "last_seen": "2026-07-23",
       "seen_in": [
         "arxiv:cs.CL"
       ]
@@ -557,6 +567,186 @@
       },
       "first_seen": "2026-06-18",
       "last_seen": "2026-06-18",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "FP8": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "8-bit floating point -- a reduced-precision numeric format used to store model weights, activations, and KV cache, trading minor accuracy for substantially lower memory footprint and higher throughput.",
+        "high-school": "A compact 8-bit number format that stores AI model data using far less memory, trading a little accuracy for speed and smaller models.",
+        "kindergarten": "A space-saving way to store an AI's numbers that makes it smaller and faster, giving up just a little precision."
+      },
+      "first_seen": "2026-07-22",
+      "last_seen": "2026-07-22",
+      "seen_in": [
+        "smol-ai:2026-07-22"
+      ]
+    },
+    "NVFP4": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "NVIDIA 4-bit floating point -- a low-precision weight-storage format that packs model parameters into 4 bits, enabling very large models to fit and run on a single GPU.",
+        "high-school": "NVIDIA's 4-bit number format for shrinking model weights so big AI models can fit and run on one graphics card.",
+        "kindergarten": "NVIDIA's tiny-storage trick that squeezes a big AI model onto one graphics card."
+      },
+      "first_seen": "2026-07-22",
+      "last_seen": "2026-07-22",
+      "seen_in": [
+        "smol-ai:2026-07-22"
+      ]
+    },
+    "KV cache": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Key-value cache -- the attention mechanism's stored intermediate representations of prior tokens, retained so the model can generate the next token without recomputing the full prefix.",
+        "high-school": "The memory a model keeps of what it already processed so it can produce the next word without redoing all the earlier work.",
+        "kindergarten": "The notes an AI keeps of what it already read so it doesn't have to re-read everything to say the next word."
+      },
+      "first_seen": "2026-07-22",
+      "last_seen": "2026-07-22",
+      "seen_in": [
+        "smol-ai:2026-07-22"
+      ]
+    },
+    "SLM": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Small language model -- a compact transformer-based language model with substantially fewer parameters than frontier LLMs, traded for lower compute cost and latency at the expense of reasoning depth",
+        "high-school": "A smaller, cheaper AI language model that runs fast and cheap but is weaker on hard reasoning tasks than a big LLM",
+        "kindergarten": "A lightweight AI language brain that's cheap to run but not as smart as the big ones"
+      },
+      "first_seen": "2026-07-23",
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "PEFT": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Training & Post-Training",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Parameter-efficient fine-tuning -- a family of methods (e.g., LoRA, adapters, prefix-tuning) that adapt a pretrained model by training only a small fraction of parameters or added modules rather than the full weight matrix",
+        "high-school": "Adapting a big AI model by training only a small added piece instead of retuning the whole network, saving memory and compute",
+        "kindergarten": "Customizing an AI by tweaking a small extra part instead of rebuilding the whole thing"
+      },
+      "first_seen": "2026-07-23",
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "RECAP": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Papers & Theory",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Readable Encodings via Co-trained Auxiliary Predictors -- a method that trains small linear probe heads alongside the target model so designated internal content remains decodable by an independent probe, making verbalized explanations independently checkable",
+        "high-school": "Training small side-models with the main AI so its hidden thoughts stay readable by an outside checker, preventing the AI from faking explanations",
+        "kindergarten": "Giving the AI a built-in lie-detector so a separate checker can tell if its explanations are true"
+      },
+      "first_seen": "2026-07-23",
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "PAC": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Benchmarks & Evaluation",
+      "source_level": "doctor",
+      "plainspeak": {
+        "doctor": "Probably Approximately Correct -- a learning-theory framework providing probabilistic guarantees that a learned model's error on unseen data stays within a specified bound with high confidence",
+        "high-school": "A math framework that guarantees, with high probability, that a model's real-world error stays below a chosen limit",
+        "kindergarten": "A promise that an AI's mistakes will stay below a known amount, most of the time"
+      },
+      "first_seen": "2026-07-23",
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "AUC": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Benchmarks & Evaluation",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Area Under the (ROC) Curve -- a threshold-independent metric summarizing a classifier's ability to rank positive instances above negatives; 1.0 is perfect separation, 0.5 is random",
+        "high-school": "A single score (0 to 1) showing how well a classifier tells two groups apart; 1.0 is perfect, 0.5 is a coin flip",
+        "kindergarten": "A grade from 0 to 1 for how good an AI is at telling things apart"
+      },
+      "first_seen": "2026-07-23",
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "MATH": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Benchmarks & Evaluation",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "MATH -- a benchmark of thousands of competition-level mathematics word problems requiring multi-step reasoning, widely used to evaluate the mathematical capability of LLMs",
+        "high-school": "A tough math-problem benchmark used to test how well AI models can reason through multi-step math",
+        "kindergarten": "A hard math test for AIs that checks if they can solve competition-style problems"
+      },
+      "first_seen": "2026-07-23",
+      "last_seen": "2026-07-23",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "ASR": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Automatic speech recognition -- the task of converting spoken audio into written text using acoustic and language models",
+        "high-school": "A computer system that listens to speech and transcribes it into written words",
+        "kindergarten": "A computer system that turns spoken audio into written text"
+      },
+      "first_seen": "2026-07-24",
+      "last_seen": "2026-07-24",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "WER": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Benchmarks & Evaluation",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Word error rate -- the percentage of words a speech-recognition system transcribes incorrectly, computed as (substitutions + insertions + deletions) / total reference words; lower is better",
+        "high-school": "A score for speech-to-text accuracy: the fraction of words the system gets wrong, lower is better",
+        "kindergarten": "A score (lower is better) for how many words a speech-to-text system gets wrong"
+      },
+      "first_seen": "2026-07-24",
+      "last_seen": "2026-07-24",
+      "seen_in": [
+        "arxiv:cs.CL"
+      ]
+    },
+    "MTP": {
+      "theme": "AI & ML Research",
+      "sub_theme": "Models & Architectures",
+      "source_level": "high-school",
+      "plainspeak": {
+        "doctor": "Multi-token prediction -- a model head that predicts several future tokens at once (rather than a single next token), used as the draft stage in speculative decoding to accelerate generation",
+        "high-school": "A model component that guesses several upcoming words at once to speed up text generation",
+        "kindergarten": "A model head that predicts several future tokens at once to speed up text generation"
+      },
+      "first_seen": "2026-07-24",
+      "last_seen": "2026-07-24",
       "seen_in": [
         "arxiv:cs.CL"
       ]
