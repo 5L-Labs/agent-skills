@@ -70,34 +70,6 @@ class BaseClient:
         self._fetch_count = 0
         self._last_origin_fetch_at: float = 0.0
 
-class CookieAuthMixin:
-    """Mixin to handle cookie-based authentication for readers."""
-
-    REQUIRED_COOKIES: list[str] = []
-
-    def _build_cookie_header(self) -> str:
-        cookies = {}
-        for name in self.REQUIRED_COOKIES:
-            val = os.environ.get(f"{self.SOURCE}_{name}")
-            if not val:
-                raise self._SessionExpired(
-                    f"Missing required cookie {name} for {self.SOURCE}. "
-                    f"Set {self.SOURCE}_{name} in environment."
-                )
-            cookies[name] = val
-        return "; ".join([f"{k}={v}" for k, v in cookies.items()])
-
-    @property
-    def cookie_header(self) -> str:
-        """Public property to trigger cookie validation lazily."""
-        return self._build_cookie_header()
-
-    def _headers(self) -> dict:
-        h = {"User-Agent": self.user_agent, "Accept": "application/json"}
-        cookie_str = self._build_cookie_header()
-        if cookie_str:
-            h["Cookie"] = cookie_str
-        return h
 
 
     # -- internal --------------------------------------------------------
@@ -140,6 +112,8 @@ class CookieAuthMixin:
         timeout: int = 30,
         binary: bool = False,
     ) -> requests.Response:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
         self._check_budget()
         if space:
             self._space()
@@ -149,7 +123,7 @@ class CookieAuthMixin:
 
         for attempt in range(4):
             try:
-                r = self.session.request(method, url, headers=h, timeout=timeout)
+                r = self.session.request(method, url, headers=h, timeout=timeout)  # nosec B310
             except requests.RequestException as e:
                 raise self._Upstream(f"network error for {url}: {e}") from e
 
@@ -200,3 +174,33 @@ class CookieAuthMixin:
     ) -> bytes:
         r = self._request(url, headers=headers, space=space, timeout=60)
         return r.content
+
+
+class CookieAuthMixin:
+    """Mixin to handle cookie-based authentication for readers."""
+
+    REQUIRED_COOKIES: list[str] = []
+
+    def _build_cookie_header(self) -> str:
+        cookies = {}
+        for name in self.REQUIRED_COOKIES:
+            val = os.environ.get(f"{self.SOURCE}_{name}")
+            if not val:
+                raise self._SessionExpired(
+                    f"Missing required cookie {name} for {self.SOURCE}. "
+                    f"Set {self.SOURCE}_{name} in environment."
+                )
+            cookies[name] = val
+        return "; ".join([f"{k}={v}" for k, v in cookies.items()])
+
+    @property
+    def cookie_header(self) -> str:
+        """Public property to trigger cookie validation lazily."""
+        return self._build_cookie_header()
+
+    def _headers(self) -> dict:
+        h = {"User-Agent": self.user_agent, "Accept": "application/json"}
+        cookie_str = self._build_cookie_header()
+        if cookie_str:
+            h["Cookie"] = cookie_str
+        return h
