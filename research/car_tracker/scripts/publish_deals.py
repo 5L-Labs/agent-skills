@@ -77,10 +77,10 @@ def extract_color(car):
             return val
             
     # 2. VDP HTML parsing fallback if URL is valid
-    if vdp_url and vdp_url.startswith("http"):
+    if vdp_url and vdp_url.lower().startswith(("http://", "https://")):
         try:
             headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-            r = requests.get(vdp_url, headers=headers, timeout=3)
+            r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
             if r.status_code == 200:
                 html = r.text.lower()
                 for key, val in color_map.items():
@@ -255,10 +255,10 @@ def get_features_summary(car, make, model, api_key):
         has_pvm = any(kw in text_to_scan for kw in pvm_keywords)
         has_capt = any(kw in text_to_scan for kw in capt_keywords)
         
-        if (not has_pano or not has_pvm or not has_capt) and vdp_url and vdp_url.startswith("http"):
+        if (not has_pano or not has_pvm or not has_capt) and vdp_url and vdp_url.lower().startswith(("http://", "https://")):
             try:
                 headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-                r = requests.get(vdp_url, headers=headers, timeout=3)
+                r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
                 if r.status_code == 200:
                     html_text = r.text.upper()
                     if not has_pano: has_pano = any(kw in html_text for kw in pano_keywords)
@@ -285,10 +285,10 @@ def get_features_summary(car, make, model, api_key):
         has_tech = any(kw in text_to_scan for kw in tech_keywords)
         has_capt = any(kw in text_to_scan for kw in capt_keywords)
         
-        if (not has_ml or not has_tech or not has_capt) and vdp_url and vdp_url.startswith("http"):
+        if (not has_ml or not has_tech or not has_capt) and vdp_url and vdp_url.lower().startswith(("http://", "https://")):
             try:
                 headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-                r = requests.get(vdp_url, headers=headers, timeout=3)
+                r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
                 if r.status_code == 200:
                     html_text = r.text.upper()
                     if not has_ml: has_ml = any(kw in html_text for kw in ml_keywords)
@@ -309,10 +309,10 @@ def get_features_summary(car, make, model, api_key):
         hk_keywords = ["HARMAN KARDON", "HARMAN/KARDON", "HK SOUND", "HK AUDIO", "19-SPEAKER", "19 SPEAKER"]
         
         has_hk = any(kw in text_to_scan for kw in hk_keywords)
-        if not has_hk and vdp_url and vdp_url.startswith("http"):
+        if not has_hk and vdp_url and vdp_url.lower().startswith(("http://", "https://")):
             try:
                 headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-                r = requests.get(vdp_url, headers=headers, timeout=3)
+                r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
                 if r.status_code == 200:
                     html_text = r.text.upper()
                     has_hk = any(kw in html_text for kw in hk_keywords)
