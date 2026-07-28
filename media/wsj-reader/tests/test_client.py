@@ -34,10 +34,10 @@ def test_missing_cookie_is_lazy_not_fatal_at_init(monkeypatch, tmp_path):
 
 
 @responses.activate
-def test_graphql_get_sends_apollo_headers_no_cookie(monkeypatch, tmp_path):
-    """GraphQL transport must not require WSJ_COOKIE."""
+def test_graphql_get_sends_apollo_headers_with_cookie(monkeypatch, tmp_path):
+    """GraphQL transport now requires and sends WSJ_COOKIE since mid-2026."""
     monkeypatch.setenv("WSJ_CACHE_DIR", str(tmp_path))
-    monkeypatch.delenv("WSJ_COOKIE", raising=False)
+    monkeypatch.setenv("WSJ_COOKIE", "session_token=xyz")
     monkeypatch.setenv("WSJ_REQUEST_SPACING_MS", "100")
     responses.add(
         responses.GET,
@@ -50,8 +50,8 @@ def test_graphql_get_sends_apollo_headers_no_cookie(monkeypatch, tmp_path):
     req = responses.calls[0].request
     assert req.headers["apollographql-client-name"] == "wsj-generator-olympia"
     assert req.headers["apollographql-client-version"] == "article"
-    # No Cookie header at all.
-    assert "Cookie" not in req.headers
+    # Cookie header must be present.
+    assert req.headers["Cookie"] == "session_token=xyz"
     # The persisted-query envelope landed in the URL.
     assert "persistedQuery" in req.url
     assert "deadbeef" in req.url

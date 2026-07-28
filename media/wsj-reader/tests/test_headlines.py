@@ -215,10 +215,10 @@ def test_headlines_graphql_alias_resolves_to_canonical(fake_env, monkeypatch):
 
 
 @responses.activate
-def test_headlines_graphql_works_without_cookie(monkeypatch, tmp_path):
-    """The marquee win: WSJ_COOKIE is not required for GraphQL."""
+def test_headlines_graphql_sends_cookie(monkeypatch, tmp_path):
+    """GraphQL transport now requires and sends WSJ_COOKIE."""
     monkeypatch.setenv("WSJ_CACHE_DIR", str(tmp_path))
-    monkeypatch.delenv("WSJ_COOKIE", raising=False)
+    monkeypatch.setenv("WSJ_COOKIE", "session_token=abc")
     monkeypatch.setenv("WSJ_REQUEST_SPACING_MS", "100")
     responses.add(
         responses.GET,
