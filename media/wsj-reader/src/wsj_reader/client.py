@@ -1,19 +1,21 @@
 """WSJ HTTP client.
- 
-Two transport paths:
- 
+
+Three transport paths:
+
 * HTML / JSON transport (cookies + browser-like headers) — used for article-body
   extraction and the legacy audio resolver. Subject to Datadome bot protection;
   cookies last ~24h in practice.
-* GraphQL transport (NO auth, no cookies) — used for headlines + audio
-  resolution. Hits shared-data.dowjones.io which is not Datadome-protected and
-  works indefinitely without re-paste.
- 
+* Public HTML transport (no cookies) — used for homepage headline discovery.
+* GraphQL transport — optional collection/audio metadata transport. WSJ has
+  required cookies since mid-2026, so it is no longer the default headline
+  source.
+
 The cookie is loaded lazily; only the cookie-bound transports touch it.
 """
 from __future__ import annotations
 import json as _json
 import os
+import time
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlencode
@@ -65,9 +67,28 @@ class WSJClient(BaseClient, CookieAuthMixin):
                 "No WSJ_COOKIE in env. Copy the full Cookie header value from a "
                 "logged-in browser DevTools Network request to www.wsj.com and "
                 "set it as WSJ_COOKIE in .env. See scripts/set_cookie.py. "
-                "(Both GraphQL and HTML transports now require cookies since mid-2026.)"
+                "(Tip: 'wsj headlines' works WITHOUT cookies via the homepage "
+                "transport.)"
             )
         return blob.strip().encode("ascii", errors="replace").decode("ascii")
+
+    def _public_html_headers(self, *, referer: Optional[str] = None) -> dict:
+        headers = {
+            "User-Agent": self.user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
+            "Priority": "u=0, i",
+            "DNT": "1",
+        }
+        if referer:
+            headers["Referer"] = referer
+        return headers
 
     def _html_headers(self, *, referer: Optional[str] = None) -> dict:
         h = super()._headers()
@@ -96,7 +117,7 @@ class WSJClient(BaseClient, CookieAuthMixin):
         return h
 
     def _graphql_headers(self) -> dict:
-        """No Authorization. Cookie is now required — WSJ started enforcing it."""
+        """No Authorization. Cookie is now required."""
         h = {"User-Agent": self.user_agent}
         h.update({
             "Accept": "*/*",
@@ -132,6 +153,7 @@ class WSJClient(BaseClient, CookieAuthMixin):
         *,
         space: bool = True,
     ) -> Any:
+        """Hit the WSJ GraphQL gateway with a persisted query."""
         params = {
             "variables": _json.dumps(variables or {}, separators=(",", ":")),
             "extensions": _json.dumps(
@@ -152,4 +174,32 @@ class WSJClient(BaseClient, CookieAuthMixin):
         r = self._request(url, headers=self._html_headers(referer=referer), space=space, timeout=30)
         return r.text
 
-
+    def get_public_html(
+        self,
+        url: str,
+        *,
+        space: bool = True,
+        referer: Optional[str] = None,
+    ) -> str:
+        """Fetch public HTML without reading or sending WSJ_COOKIE."""
+        self._check_budget()
+        if space:
+            self._space()
+        try:
+            r = self.session.get(
+                url,
+                headers=self._public_html_headers(referer=referer),
+                timeout=30,
+            )
+        except requests.RequestException as e:
+            raise UpstreamError(f"network error for {url}: {e}") from e
+        self._fetch_count += 1
+        self._last_origin_fetch_at = time.time()
+        if r.status_code == 404:
+            raise NotFoundError(f"{self.SOURCE} returned 404 for {url}")
+        if r.status_code >= 400:
+            raise UpstreamError(
+                f"{self.SOURCE} public homepage fetch returned {r.status_code} "
+                f"for {url}: {r.text[:200]}"
+            )
+        return r.text

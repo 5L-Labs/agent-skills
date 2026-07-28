@@ -22,13 +22,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     ph = sub.add_parser(
         "headlines",
         help=(
-            "Headlines. Default transport is GraphQL (cookie required since "
-            "mid-2026). Use --via=html for the print-edition scraper."
+            "Headlines. Default transport is the public WSJ homepage (no auth). "
+            "Use --via=graphql for named collections or --via=html for the "
+            "cookie-bound print-edition scraper."
         ),
     )
     ph.add_argument(
-        "--via", choices=["graphql", "html"], default="graphql",
-        help="Transport: 'graphql' (default, cookie required) or 'html' (print edition).",
+        "--via", choices=["homepage", "graphql", "html"], default="homepage",
+        help="Transport: 'homepage' (default, no auth), 'graphql', or 'html' (print edition).",
     )
     ph.add_argument(
         "--collection", default=None,
@@ -59,6 +60,17 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         if args.cmd == "headlines":
+            if args.via == "homepage":
+                if args.collection:
+                    p.error("--collection requires --via=graphql")
+                if args.date:
+                    p.error("--date requires --via=html")
+                if args.section:
+                    p.error("--section requires --via=html")
+                if args.audio_only:
+                    p.error("--audio-only requires --via=graphql")
+            elif args.via == "html" and (args.collection or args.audio_only):
+                p.error("--collection and --audio-only require --via=graphql")
             payload = get_headlines(
                 via=args.via, collection=args.collection,
                 audio_only=args.audio_only, edition_date=args.date,
