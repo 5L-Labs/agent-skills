@@ -67,7 +67,7 @@ class WSJClient(BaseClient, CookieAuthMixin):
                 "set it as WSJ_COOKIE in .env. See scripts/set_cookie.py. "
                 "(Tip: 'wsj headlines' works WITHOUT cookies via --via=graphql.)"
             )
-        return blob.strip()
+        return blob.strip().encode("ascii", errors="replace").decode("ascii")
 
     def _html_headers(self, *, referer: Optional[str] = None) -> dict:
         h = super()._headers()
@@ -97,8 +97,13 @@ class WSJClient(BaseClient, CookieAuthMixin):
 
     def _graphql_headers(self) -> dict:
         """No Authorization. Cookie is now required — WSJ started enforcing it."""
+<<<<<<< HEAD
         h = {"User-Agent": self.user_agent}
         h.update({
+=======
+        return {
+            "User-Agent": self.user_agent,
+>>>>>>> pr-99
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate",
