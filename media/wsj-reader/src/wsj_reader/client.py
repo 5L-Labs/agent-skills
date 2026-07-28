@@ -92,7 +92,7 @@ class WSJClient(BaseClient):
                 "set it as WSJ_COOKIE in .env. See scripts/set_cookie.py. "
                 "(Tip: 'wsj headlines' works WITHOUT cookies via --via=graphql.)"
             )
-        self._cookie_header = blob.strip().encode("ascii", errors="ignore").decode("ascii")
+        self._cookie_header = blob.strip().encode("ascii", errors="replace").decode("ascii")
         return self._cookie_header
 
     def _html_headers(self, *, referer: Optional[str] = None) -> dict:
