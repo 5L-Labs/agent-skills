@@ -34,7 +34,6 @@ def fetch_html(
     Retries up to `WAYTOAGI_MAX_RETRIES` (default 2) with exponential backoff on
     5xx / connection-class errors. A transient Feishu glitch shouldn't wedge the
     5-minute cache TTL on the user's next invocation."""
-
     if not url.lower().startswith(("http://", "https://")):
         raise ValueError(f"Invalid URL scheme: {url}")
 
