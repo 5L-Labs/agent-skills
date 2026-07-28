@@ -96,14 +96,15 @@ class WSJClient(BaseClient, CookieAuthMixin):
         return h
 
     def _graphql_headers(self) -> dict:
-        """No Cookie, no Authorization. Only the Apollo client-name is required."""
-        h = {"User-Agent": self.user_agent} # No cookies for GraphQL
+        """No Authorization. Cookie is now required — WSJ started enforcing it."""
+        h = {"User-Agent": self.user_agent}
         h.update({
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate",
             "Referer": f"{self.BASE}/",
             "Origin": self.BASE,
+            "Cookie": self.cookie_header,
             "apollographql-client-name": self.GRAPHQL_CLIENT_NAME,
             "apollographql-client-version": self.GRAPHQL_CLIENT_VERSION,
         })

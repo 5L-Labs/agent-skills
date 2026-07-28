@@ -18,6 +18,19 @@ __pycache__/
 .venv/
 venv/
 
+# Runtime state (never commit)
+**/seen_listings.json
+**/benchmark_prices.json
+**/benchmark_price.json
+**/cache/
+
+# Build artifacts
+*.egg-info/
+.pytest_cache/
+
+# Tool tracking
+.jules/
+
 # Secrets
 *.env
 *.key
