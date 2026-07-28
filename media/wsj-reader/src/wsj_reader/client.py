@@ -90,9 +90,9 @@ class WSJClient(BaseClient):
                 "No WSJ_COOKIE in env. Copy the full Cookie header value from a "
                 "logged-in browser DevTools Network request to www.wsj.com and "
                 "set it as WSJ_COOKIE in .env. See scripts/set_cookie.py. "
-                "(Tip: 'wsj headlines' works WITHOUT cookies via --via=graphql.)"
+                "(Both GraphQL and HTML transports now require cookies since mid-2026.)"
             )
-        self._cookie_header = blob.strip().encode("ascii", errors="ignore").decode("ascii")
+        self._cookie_header = blob.strip().encode("ascii", errors="replace").decode("ascii")
         return self._cookie_header
 
     def _html_headers(self, *, referer: Optional[str] = None) -> dict:
