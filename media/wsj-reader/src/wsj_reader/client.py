@@ -182,6 +182,8 @@ class WSJClient(BaseClient, CookieAuthMixin):
         referer: Optional[str] = None,
     ) -> str:
         """Fetch public HTML without reading or sending WSJ_COOKIE."""
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme: {url}")
         self._check_budget()
         if space:
             self._space()
@@ -190,7 +192,7 @@ class WSJClient(BaseClient, CookieAuthMixin):
                 url,
                 headers=self._public_html_headers(referer=referer),
                 timeout=30,
-            )
+            )  # nosec B310
         except requests.RequestException as e:
             raise UpstreamError(f"network error for {url}: {e}") from e
         self._fetch_count += 1
