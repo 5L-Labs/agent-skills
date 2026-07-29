@@ -15,6 +15,7 @@ from .headlines import get_headlines
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     p = argparse.ArgumentParser(prog="wsj", description="Read WSJ via the user's session.")
     p.add_argument("--json-errors", action="store_true",
                    help="Accepted before the subcommand (same as the per-subcommand flag).")
@@ -71,8 +72,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                     help="Seconds to wait for login/unlock cookies before failing.")
     pr.add_argument("--dry-run", action="store_true",
                     help="Do not write .env; report cookie/session status only.")
+    add_common_flags(pr)
 
-    args = p.parse_args(argv)
+    args = p.parse_args(raw_argv)
+    if "--json-errors" in raw_argv:
+        args.json_errors = True
 
     try:
         if args.cmd == "headlines":

@@ -32,12 +32,11 @@ def refresh_cookie_with_browser(
     logs in once can refresh cookies later without reauthenticating every run.
     """
     try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
         from playwright.sync_api import sync_playwright
     except ImportError as e:
-        raise UpstreamError(
-            "Playwright is not installed. Install with: "
-            "pip install -e '.[browser]' && python -m playwright install chromium"
-        ) from e
+        raise _browser_install_error() from e
 
     target = url or DEFAULT_REFRESH_URL
     profile = Path(profile_dir or os.environ.get("WSJ_BROWSER_PROFILE_DIR", DEFAULT_PROFILE_DIR)).expanduser()
@@ -45,17 +44,32 @@ def refresh_cookie_with_browser(
     deadline = time.monotonic() + max(timeout_s, 1)
 
     with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(
-            str(profile),
-            headless=headless,
-            viewport={"width": 1440, "height": 1000},
-        )
+        try:
+            context = p.chromium.launch_persistent_context(
+                str(profile),
+                headless=headless,
+                viewport={"width": 1440, "height": 1000},
+            )
+        except PlaywrightError as e:
+            if _is_browser_install_error(e):
+                raise _browser_install_error() from e
+            raise UpstreamError(f"Unable to launch Chromium for WSJ cookie refresh: {e}") from e
         try:
             page = context.pages[0] if context.pages else context.new_page()
-            page.goto(target, wait_until="domcontentloaded", timeout=60_000)
+            try:
+                page.goto(target, wait_until="domcontentloaded", timeout=_remaining_timeout_ms(deadline))
+            except PlaywrightTimeoutError as e:
+                raise _browser_timeout_error() from e
             status: dict[str, Any] = {}
             while True:
-                page.wait_for_load_state("domcontentloaded", timeout=10_000)
+                try:
+                    page.wait_for_load_state(
+                        "domcontentloaded",
+                        timeout=min(10_000, _remaining_timeout_ms(deadline)),
+                    )
+                except PlaywrightTimeoutError:
+                    if time.monotonic() >= deadline:
+                        raise _browser_timeout_error()
                 status = _article_unlock_status(page)
                 cookie_header = _cookie_header_from_playwright(
                     context.cookies("https://www.wsj.com/")
@@ -63,10 +77,7 @@ def refresh_cookie_with_browser(
                 if _ready_to_write(cookie_header, status):
                     break
                 if time.monotonic() >= deadline:
-                    raise SessionExpiredError(
-                        "Browser did not produce an unlocked WSJ session before timeout. "
-                        "Sign in to WSJ in the opened browser and retry."
-                    )
+                    raise _browser_timeout_error()
                 time.sleep(2)
             if write:
                 _update_env_cookie(env_file, cookie_header)
@@ -83,7 +94,7 @@ def refresh_cookie_with_browser(
 
 
 def _ready_to_write(cookie_header: str, status: dict[str, Any]) -> bool:
-    if "datadome=" not in cookie_header or "ca_id=" not in cookie_header:
+    if not _required_cookie_names_present(cookie_header):
         return False
     if not status.get("article_page"):
         return True
@@ -98,25 +109,36 @@ def _article_unlock_status(page) -> dict[str, Any]:
           const payload = JSON.parse(el.textContent || '{}');
           const pp = payload?.props?.pageProps || {};
           const art = pp.articleData || {};
+          const tracking = art.articleTrackingMeta || {};
           const body = art.flattenedBody || art.articleBody || [];
           const paragraphs = Array.isArray(body)
             ? body.filter((b) => b && b.type === 'paragraph').length
             : 0;
-          const articlePage = Boolean(art.originId || art.upstreamOriginId || pp.isSnippetView);
+          const articleId = tracking.articleId || art.originId || art.upstreamOriginId || null;
+          const articlePage = Boolean(pp.articleData || articleId || pp.isSnippetView);
           const snippet = Boolean(pp.isSnippetView);
           const serverUnlocked = Boolean(pp.isServerUnlockedContent);
           return {
             article_page: articlePage,
-            ok: articlePage ? (!snippet && serverUnlocked && paragraphs > 5) : false,
+            ok: articlePage ? (!snippet && serverUnlocked && paragraphs >= 1) : false,
             snippet,
             serverUnlocked,
             paragraphs,
             body_blocks: Array.isArray(body) ? body.length : 0,
-            article_id: art.originId || art.upstreamOriginId || null,
+            article_id: articleId,
           };
         }"""
     )
     return data if isinstance(data, dict) else {"article_page": False}
+
+
+def _required_cookie_names_present(cookie_header: str) -> bool:
+    names = {
+        part.split("=", 1)[0].strip()
+        for part in cookie_header.split(";")
+        if "=" in part
+    }
+    return {"datadome", "ca_id"}.issubset(names)
 
 
 def _cookie_header_from_playwright(cookies: list[dict[str, Any]]) -> str:
@@ -142,7 +164,8 @@ def _update_env_cookie(env_path: Path, cookie_header: str) -> None:
     lines: list[str] = []
     seen = False
     for line in existing.splitlines():
-        if line.startswith("WSJ_COOKIE="):
+        key = line.split("=", 1)[0].strip() if "=" in line else None
+        if key == "WSJ_COOKIE":
             lines.append(f"WSJ_COOKIE={cookie_header}")
             seen = True
         else:
@@ -151,3 +174,30 @@ def _update_env_cookie(env_path: Path, cookie_header: str) -> None:
         lines.append(f"WSJ_COOKIE={cookie_header}")
     env_path.write_text("\n".join(lines).rstrip() + "\n")
     os.chmod(env_path, 0o600)
+
+
+def _browser_install_error() -> UpstreamError:
+    return UpstreamError(
+        "Playwright Chromium is not installed. Install with: "
+        "pip install -e '.[browser]' && python -m playwright install chromium"
+    )
+
+
+def _browser_timeout_error() -> SessionExpiredError:
+    return SessionExpiredError(
+        "Browser did not produce an unlocked WSJ session before timeout. "
+        "Sign in to WSJ in the opened browser and retry."
+    )
+
+
+def _remaining_timeout_ms(deadline: float) -> int:
+    return max(1, int((deadline - time.monotonic()) * 1000))
+
+
+def _is_browser_install_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return (
+        "executable doesn't exist" in text
+        or "please run the following command to download new browsers" in text
+        or "playwright install" in text
+    )
