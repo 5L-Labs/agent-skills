@@ -200,6 +200,7 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None, profile=N
                         break
                     listings.extend(data)
                     offset += limit
+                    time.sleep(0.5)  # rate-limit spacing
                 else:
                     print(f"[-] Warning: Visor API request failed with status code {r.status_code}", file=sys.stderr)
                     break

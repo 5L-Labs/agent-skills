@@ -106,7 +106,8 @@ def extract_color(car):
             if response.status_code == 200:
                 html = response.text.lower()
                 for key, val in color_map.items():
-                    if key in html:
+                    import re
+                    if re.search(r'\b' + re.escape(key) + r'\b', html):
                         return val
         except Exception:
             pass

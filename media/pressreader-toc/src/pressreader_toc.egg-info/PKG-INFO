@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: pressreader-toc
+Version: 0.1.0
+Summary: Fetch and normalize the FT print edition table-of-contents from PressReader, then map stories to ft.com URLs.
+Author: Nick Lange
+License: Apache-2.0
+Requires-Python: >=3.10
+Requires-Dist: news-reader-base @ file:../news-reader-base
+Provides-Extra: dev
+Requires-Dist: pytest>=7; extra == "dev"
