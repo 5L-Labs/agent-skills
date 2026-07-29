@@ -60,6 +60,8 @@ def refresh_cookie_with_browser(
                 page.goto(target, wait_until="domcontentloaded", timeout=_remaining_timeout_ms(deadline))
             except PlaywrightTimeoutError as e:
                 raise _browser_timeout_error() from e
+            except PlaywrightError as e:
+                raise UpstreamError(f"Unable to navigate Chromium to WSJ for cookie refresh: {e}") from e
             status: dict[str, Any] = {}
             while True:
                 try:
@@ -70,6 +72,8 @@ def refresh_cookie_with_browser(
                 except PlaywrightTimeoutError:
                     if time.monotonic() >= deadline:
                         raise _browser_timeout_error()
+                except PlaywrightError as e:
+                    raise UpstreamError(f"Unable to load WSJ in Chromium for cookie refresh: {e}") from e
                 status = _article_unlock_status(page)
                 cookie_header = _cookie_header_from_playwright(
                     context.cookies("https://www.wsj.com/")

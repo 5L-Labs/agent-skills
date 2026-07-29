@@ -122,3 +122,48 @@ def test_refresh_cookie_translates_navigation_timeout(monkeypatch, tmp_path):
 
     with pytest.raises(SessionExpiredError, match=r"before timeout"):
         refresh_cookie_with_browser(env_path=tmp_path / ".env", timeout_s=1)
+
+
+def test_refresh_cookie_translates_navigation_error(monkeypatch, tmp_path):
+    class FakePlaywrightError(Exception):
+        pass
+
+    class FakeTimeoutError(Exception):
+        pass
+
+    class FakePage:
+        def goto(self, *_args, **_kwargs):
+            raise FakePlaywrightError("net::ERR_CONNECTION_RESET")
+
+    class FakeContext:
+        pages = [FakePage()]
+
+        def close(self):
+            pass
+
+    class FakeChromium:
+        def launch_persistent_context(self, *_args, **_kwargs):
+            return FakeContext()
+
+    class FakePlaywright:
+        chromium = FakeChromium()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    class FakeModule:
+        Error = FakePlaywrightError
+        TimeoutError = FakeTimeoutError
+
+        @staticmethod
+        def sync_playwright():
+            return FakePlaywright()
+
+    monkeypatch.setitem(sys.modules, "playwright", object())
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", FakeModule)
+
+    with pytest.raises(UpstreamError, match=r"Unable to navigate Chromium"):
+        refresh_cookie_with_browser(env_path=tmp_path / ".env", timeout_s=1)
