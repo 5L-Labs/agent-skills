@@ -44,3 +44,38 @@ def test_headlines_cli_rejects_homepage_audio_only(capsys):
     captured = capsys.readouterr()
     assert exc.value.code == 2
     assert "--audio-only requires --via=graphql" in captured.err
+
+
+def test_refresh_cookie_cli_invokes_browser_helper(monkeypatch, capsys):
+    captured_args = {}
+
+    def fake_refresh(**kwargs):
+        captured_args.update(kwargs)
+        return {"wrote": False, "cookie_count": 2, "ok": True}
+
+    monkeypatch.setattr("wsj_reader.cli.refresh_cookie_with_browser", fake_refresh)
+
+    rc = main([
+        "refresh-cookie",
+        "https://www.wsj.com/finance/test",
+        "--profile-dir",
+        "/tmp/wsj-profile",
+        "--headless",
+        "--timeout",
+        "3",
+        "--dry-run",
+    ])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert rc == 0
+    assert payload["schema_version"] == 1
+    assert payload["wrote"] is False
+    assert payload["cookie_count"] == 2
+    assert captured_args == {
+        "url": "https://www.wsj.com/finance/test",
+        "profile_dir": "/tmp/wsj-profile",
+        "headless": True,
+        "timeout_s": 3,
+        "write": False,
+    }

@@ -10,6 +10,7 @@ from . import SCHEMA_VERSION
 from .article import get_article
 from .audio import get_audio
 from .client import WSJError
+from .cookie_refresh import DEFAULT_REFRESH_URL, refresh_cookie_with_browser
 from .headlines import get_headlines
 
 
@@ -56,6 +57,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     pad.add_argument("--download", action="store_true", help="Also download the MP3 to cache.")
     add_common_flags(pad)
 
+    pr = sub.add_parser(
+        "refresh-cookie",
+        help="Open a persistent Chromium profile and refresh WSJ_COOKIE from real browser cookies.",
+    )
+    pr.add_argument("url", nargs="?", default=DEFAULT_REFRESH_URL,
+                    help="WSJ page to open. Use a subscriber article to verify full unlock.")
+    pr.add_argument("--profile-dir", default=None,
+                    help="Persistent browser profile directory. Defaults to ~/.wsj-reader-browser.")
+    pr.add_argument("--headless", action="store_true",
+                    help="Run Chromium headless. Headed mode is recommended for DataDome/login.")
+    pr.add_argument("--timeout", type=int, default=120,
+                    help="Seconds to wait for login/unlock cookies before failing.")
+    pr.add_argument("--dry-run", action="store_true",
+                    help="Do not write .env; report cookie/session status only.")
+
     args = p.parse_args(argv)
 
     try:
@@ -80,6 +96,17 @@ def main(argv: Optional[list[str]] = None) -> int:
             payload = wrap(get_article(args.url, no_cache=args.no_cache), SCHEMA_VERSION)
         elif args.cmd == "audio":
             payload = wrap(get_audio(args.ref, download=args.download, no_cache=args.no_cache), SCHEMA_VERSION)
+        elif args.cmd == "refresh-cookie":
+            payload = wrap(
+                refresh_cookie_with_browser(
+                    url=args.url,
+                    profile_dir=args.profile_dir,
+                    headless=args.headless,
+                    timeout_s=args.timeout,
+                    write=not args.dry_run,
+                ),
+                SCHEMA_VERSION,
+            )
         else:
             p.error(f"unknown command {args.cmd}")
             return 1

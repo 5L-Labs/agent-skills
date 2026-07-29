@@ -14,6 +14,13 @@ pip install -e .
 
 For tests: `pip install -e ".[dev]"`.
 
+For browser-based cookie refresh:
+
+```sh
+pip install -e ".[browser]"
+python -m playwright install chromium
+```
+
 ## Configure cookies for articles/audio (~10s with bookmarklet)
 
 `wsj headlines` uses the public homepage and does not need `WSJ_COOKIE`. Article extraction and `wsj audio <url>` need a logged-in session. WSJ's session is split across many cookies (`DJSESSION`, `djcs_*`, Adobe `AMCV_*`, datadome, consent flags…) and the **full Cookie header is required** for those authenticated paths — no minimal subset works.
@@ -58,6 +65,21 @@ python scripts/set_cookie.py cookie.txt      # from a file
 python scripts/set_cookie.py --dry-run       # print what would be written
 ```
 
+### Browser refresh helper
+
+Use this when WSJ article extraction returns `SESSION_EXPIRED` or snippet-mode
+content. It opens a persistent Chromium profile in headed mode by default, so
+DataDome and login flows run in a real browser session.
+
+```sh
+wsj refresh-cookie 'https://www.wsj.com/finance/...'
+```
+
+If the browser is not already logged in, sign in when it opens and let the
+command continue. For subscriber article URLs, the helper writes `.env` only
+after the page reports a full server-unlocked article. Use `--dry-run` to report
+cookie/session status without updating `.env`.
+
 ## Use
 
 ```sh
@@ -68,6 +90,7 @@ wsj headlines --via=graphql --collection most-popular --limit 5
 wsj article https://www.wsj.com/finance/...html
 wsj audio https://www.wsj.com/finance/...html --download
 wsj audio WP-WSJ-0003640310 --download        # skip the article fetch
+wsj refresh-cookie https://www.wsj.com/finance/...  # headed Chromium cookie refresh
 ```
 
 Add `--json-errors` to mirror failures as structured JSON on stdout.

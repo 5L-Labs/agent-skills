@@ -10,6 +10,7 @@ After `pip install -e .` in this directory:
 wsj headlines [--via homepage|graphql|html] [--collection ID|alias] [--date YYYYMMDD] [--section front|business|world|popular] [--limit N] [--no-cache] [--json-errors]
 wsj article <url> [--no-cache] [--json-errors]
 wsj audio <url-or-WP-WSJ-id> [--download] [--no-cache] [--json-errors]
+wsj refresh-cookie [url] [--profile-dir DIR] [--headless] [--timeout SEC] [--dry-run]
 ```
 
 All commands print one JSON object to stdout with `"schema_version": 1`. Errors go to stderr; `--json-errors` mirrors them to stdout as `{"error": {"code", "message"}}`.
@@ -28,13 +29,15 @@ All commands print one JSON object to stdout with `"schema_version": 1`. Errors 
 
 Optional for default `wsj headlines`; required for `wsj article`, `wsj audio <url>`, `wsj headlines --via=graphql`, and `wsj headlines --via=html`: `WSJ_COOKIE` — full browser Cookie header in `.env` or process env. Optional: `WSJ_CACHE_DIR`, `WSJ_REQUEST_SPACING_MS` (default 400, range 100–5000), `WSJ_MAX_FETCHES` (default 200), `WSJ_USER_AGENT`.
 
+Optional for `wsj refresh-cookie`: install the browser extra and Chromium with `pip install -e ".[browser]" && python -m playwright install chromium`. The helper uses `WSJ_BROWSER_PROFILE_DIR` or `~/.wsj-reader-browser` for the persistent browser profile.
+
 ## Output schemas
 
 All commands emit `schema_version: 1` JSON objects with stable top-level keys.
 
 ## Non-interactive guarantee
 
-The CLI never prompts. Cookie problems surface as `SESSION_EXPIRED` (exit 2) on stderr.
+Normal reader commands never prompt. Cookie problems surface as `SESSION_EXPIRED` (exit 2) on stderr. `wsj refresh-cookie` is explicitly human/browser-assisted and may require signing in to the opened Chromium window.
 
 ## Caching
 
