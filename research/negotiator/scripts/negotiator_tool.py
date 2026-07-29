@@ -135,13 +135,19 @@ def car_matches_profile(car, make, model, trim, target_vin=None, profile=None):
         return False
         
     # Powertrain matching
-    if target_powertrain and len(car_vin) > 9:
-        if make.lower() in ["toyota", "lexus"]:
-            if car_vin[3:5] != target_powertrain:
-                return False
+    if len(car_vin) > 9:
+        if make.lower() in ("toyota", "lexus"):
+            car_code = car_vin[3:5]
+            if requires_hybrid:
+                if car_code not in ("AC", "AD"):
+                    return False
+            else:
+                if car_code not in ("AA", "AB"):
+                    return False
         elif make.lower() == "chrysler":
-            if car_vin[5] != target_powertrain:
-                return False
+            if target_powertrain:
+                if car_vin[5] != target_powertrain:
+                    return False
                 
     # Condition matching (strictly new)
     if car_type != "new":
@@ -150,7 +156,7 @@ def car_matches_profile(car, make, model, trim, target_vin=None, profile=None):
     # Match trim keywords
     listing_text = f"{model} {car_trim}".upper()
     if req_keywords:
-        if not any(k.upper() in listing_text for k in req_keywords):
+        if not all(k.upper() in listing_text for k in req_keywords):
             return False
             
     # Match AWD
@@ -194,6 +200,7 @@ def get_cheapest_national(make, model, trim, api_key, target_vin=None, profile=N
                         break
                     listings.extend(data)
                     offset += limit
+                    time.sleep(0.5)  # rate-limit spacing
                 else:
                     print(f"[-] Warning: Visor API request failed with status code {r.status_code}", file=sys.stderr)
                     break

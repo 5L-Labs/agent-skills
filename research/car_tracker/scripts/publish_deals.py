@@ -32,7 +32,6 @@ def extract_color(car):
     vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
     trim = car.get("trim") or ""
     desc = car.get("description") or car.get("title") or car.get("name") or ""
-    text = f"{vdp_url} {trim} {desc}".lower()
     
     color_map = {
         "storm cloud": "Storm Cloud",
@@ -72,9 +71,25 @@ def extract_color(car):
         "bronze": "Bronze",
     }
     
+    # Check trim and description first (highest signal, no URL false positives)
+    text_clean = f"{trim} {desc}".lower()
     for key, val in color_map.items():
-        if key in text:
+        if key in text_clean:
             return val
+            
+    # Check VDP URL path segments only to avoid matching dealer name in domain
+    if vdp_url:
+        from urllib.parse import urlparse
+        try:
+            parsed = urlparse(vdp_url)
+            path = parsed.path.lower()
+            for key, val in color_map.items():
+                import re
+                normalized_path = path.replace('-', ' ').replace('_', ' ')
+                if re.search(r'\b' + re.escape(key) + r'\b', normalized_path):
+                    return val
+        except Exception:
+            pass
             
     # 2. VDP HTML parsing fallback if URL is valid
     if vdp_url and vdp_url.lower().startswith(("http://", "https://")):
@@ -84,7 +99,8 @@ def extract_color(car):
             if r.status_code == 200:
                 html = r.text.lower()
                 for key, val in color_map.items():
-                    if key in html:
+                    import re
+                    if re.search(r'\b' + re.escape(key) + r'\b', html):
                         return val
         except Exception:
             pass
@@ -126,34 +142,57 @@ def seed_details_cache(project_root):
             except Exception as e:
                 print(f"[-] Warning: Failed to seed details cache from {path}: {e}", file=sys.stderr)
 
-def get_color_and_options(car, api_key):
-    vin = car.get("vin")
-    if vin and vin in seen_listings_db and seen_listings_db[vin].get("color"):
-        return seen_listings_db[vin]["color"]
-        
+def get_details_for_listing(car, api_key):
+    """Fetches details for a listing, merging it with any cached seeded/partial data."""
     listing_id = car.get("id")
+    vin = car.get("vin")
+    
     details = None
     if listing_id and listing_id in details_cache:
         details = details_cache[listing_id]
     elif vin and vin in details_cache:
         details = details_cache[vin]
         
-    if details is None and listing_id and api_key:
+    is_partial = False
+    if details:
+        # Check if the cached entry lacks options list, indicating it is a seeded partial entry
+        build = details.get("vehicle", {}).get("build", {})
+        is_partial = ("options" not in build)
+        
+    if (details is None or is_partial) and listing_id and api_key:
         url = f"https://api.visor.vin/v1/listings/{listing_id}"
         headers = {"Authorization": f"Bearer {api_key}"}
         try:
             r = requests.get(url, headers=headers, timeout=10)
             if r.status_code == 200:
-                details = r.json().get("data", {})
+                full_details = r.json().get("data", {})
+                if details:
+                    build_merged = {**details.get("vehicle", {}).get("build", {}), **full_details.get("vehicle", {}).get("build", {})}
+                    vehicle_merged = {**details.get("vehicle", {}), **full_details.get("vehicle", {}), "build": build_merged}
+                    details = {**details, **full_details, "vehicle": vehicle_merged}
+                else:
+                    details = full_details
                 details_cache[listing_id] = details
                 if vin:
                     details_cache[vin] = details
                 time.sleep(0.5)  # small rate-limit spacing
-            else:
-                details = {}
         except Exception:
-            details = {}
+            pass
             
+    return details
+
+def get_color_and_options(car, api_key):
+    vin = car.get("vin")
+    
+    # If we already have a fully resolved color and MSRP, return immediately
+    if vin and vin in seen_listings_db:
+        entry = seen_listings_db[vin]
+        db_color = entry.get("color")
+        db_msrp = entry.get("msrp")
+        if db_color and db_color != "TBD" and db_msrp:
+            return db_color
+            
+    details = get_details_for_listing(car, api_key)
     color = None
     if details:
         vehicle = details.get("vehicle", {})
@@ -166,7 +205,9 @@ def get_color_and_options(car, api_key):
     if vin and color:
         if vin not in seen_listings_db:
             seen_listings_db[vin] = {}
-        seen_listings_db[vin]["color"] = color
+        old_color = seen_listings_db[vin].get("color")
+        if not old_color or old_color == "TBD" or color != "TBD":
+            seen_listings_db[vin]["color"] = color
         
     return color
 
@@ -175,16 +216,7 @@ def get_msrp_info(car, api_key):
     if vin and vin in seen_listings_db and seen_listings_db[vin].get("msrp"):
         return seen_listings_db[vin]["msrp"]
         
-    # Ensure color/options fetching has populated cache
-    get_color_and_options(car, api_key)
-    
-    details = None
-    listing_id = car.get("id")
-    if listing_id and listing_id in details_cache:
-        details = details_cache[listing_id]
-    elif vin and vin in details_cache:
-        details = details_cache[vin]
-        
+    details = get_details_for_listing(car, api_key)
     msrp = None
     if details:
         # Check vehicle build combined_msrp
@@ -220,6 +252,24 @@ def abbreviate_color(color_name):
     else:
         return "".join(w[:3].capitalize() for w in words)
 
+def _scrape_vdp_for_keywords(vdp_url, keyword_sets):
+    """Scrapes the VDP HTML and checks for multiple lists of keywords.
+    Returns a list of boolean flags corresponding to each keyword set.
+    """
+    results = [False] * len(keyword_sets)
+    if not vdp_url or not vdp_url.lower().startswith(("http://", "https://")):
+        return results
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
+        r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
+        if r.status_code == 200:
+            html_text = r.text.upper()
+            for i, keywords in enumerate(keyword_sets):
+                results[i] = any(kw in html_text for kw in keywords)
+    except Exception:
+        pass
+    return results
+
 def get_features_summary(car, make, model, api_key):
     vin = car.get("vin")
     if vin and vin in seen_listings_db and seen_listings_db[vin].get("features"):
@@ -227,14 +277,8 @@ def get_features_summary(car, make, model, api_key):
         
     vdp_url = car.get("vdp_url") or car.get("vdpUrl") or ""
     options_text = ""
-    listing_id = car.get("id")
     
-    details = None
-    if listing_id and listing_id in details_cache:
-        details = details_cache[listing_id]
-    elif vin and vin in details_cache:
-        details = details_cache[vin]
-        
+    details = get_details_for_listing(car, api_key)
     if details:
         options_list = details.get("vehicle", {}).get("build", {}).get("options")
         if isinstance(options_list, list):
@@ -255,17 +299,11 @@ def get_features_summary(car, make, model, api_key):
         has_pvm = any(kw in text_to_scan for kw in pvm_keywords)
         has_capt = any(kw in text_to_scan for kw in capt_keywords)
         
-        if (not has_pano or not has_pvm or not has_capt) and vdp_url and vdp_url.lower().startswith(("http://", "https://")):
-            try:
-                headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-                r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
-                if r.status_code == 200:
-                    html_text = r.text.upper()
-                    if not has_pano: has_pano = any(kw in html_text for kw in pano_keywords)
-                    if not has_pvm: has_pvm = any(kw in html_text for kw in pvm_keywords)
-                    if not has_capt: has_capt = any(kw in html_text for kw in capt_keywords)
-            except Exception:
-                pass
+        if not has_pano or not has_pvm or not has_capt:
+            scraped = _scrape_vdp_for_keywords(vdp_url, [pano_keywords, pvm_keywords, capt_keywords])
+            if not has_pano: has_pano = scraped[0]
+            if not has_pvm: has_pvm = scraped[1]
+            if not has_capt: has_capt = scraped[2]
                 
         crit_matched = 2
         if has_capt: crit_matched += 1
@@ -285,17 +323,11 @@ def get_features_summary(car, make, model, api_key):
         has_tech = any(kw in text_to_scan for kw in tech_keywords)
         has_capt = any(kw in text_to_scan for kw in capt_keywords)
         
-        if (not has_ml or not has_tech or not has_capt) and vdp_url and vdp_url.lower().startswith(("http://", "https://")):
-            try:
-                headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-                r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
-                if r.status_code == 200:
-                    html_text = r.text.upper()
-                    if not has_ml: has_ml = any(kw in html_text for kw in ml_keywords)
-                    if not has_tech: has_tech = any(kw in html_text for kw in tech_keywords)
-                    if not has_capt: has_capt = any(kw in html_text for kw in capt_keywords)
-            except Exception:
-                pass
+        if not has_ml or not has_tech or not has_capt:
+            scraped = _scrape_vdp_for_keywords(vdp_url, [ml_keywords, tech_keywords, capt_keywords])
+            if not has_ml: has_ml = scraped[0]
+            if not has_tech: has_tech = scraped[1]
+            if not has_capt: has_capt = scraped[2]
                 
         crit_matched = 2
         opt_matched = 0
@@ -309,15 +341,9 @@ def get_features_summary(car, make, model, api_key):
         hk_keywords = ["HARMAN KARDON", "HARMAN/KARDON", "HK SOUND", "HK AUDIO", "19-SPEAKER", "19 SPEAKER"]
         
         has_hk = any(kw in text_to_scan for kw in hk_keywords)
-        if not has_hk and vdp_url and vdp_url.lower().startswith(("http://", "https://")):
-            try:
-                headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"}
-                r = requests.get(vdp_url, headers=headers, timeout=3)  # nosec B310
-                if r.status_code == 200:
-                    html_text = r.text.upper()
-                    has_hk = any(kw in html_text for kw in hk_keywords)
-            except Exception:
-                pass
+        if not has_hk:
+            scraped = _scrape_vdp_for_keywords(vdp_url, [hk_keywords])
+            has_hk = scraped[0]
                 
         if not has_hk and "PINNACLE" in (car.get("trim") or "").upper():
             has_hk = True
@@ -353,13 +379,19 @@ def car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requir
             pass
         
     # Powertrain matching
-    if vin_prefix and len(car_vin) > 9:
-        if make.lower() == "toyota" or make.lower() == "lexus":
-            if len(vin_prefix) > 4 and car_vin[3:5] != vin_prefix[3:5]:
-                return False
+    if len(car_vin) > 9:
+        if make.lower() in ("toyota", "lexus"):
+            car_code = car_vin[3:5]
+            if requires_hybrid:
+                if car_code not in ("AC", "AD"):
+                    return False
+            else:
+                if car_code not in ("AA", "AB"):
+                    return False
         elif make.lower() == "chrysler":
-            if len(vin_prefix) > 5 and car_vin[5] != vin_prefix[5]:
-                return False
+            if vin_prefix and len(vin_prefix) > 5:
+                if car_vin[5] != vin_prefix[5]:
+                    return False
                 
     # Condition matching (strictly new)
     if car_type != "new":
@@ -368,7 +400,7 @@ def car_matches_profile(car, make, model, trim, vin_prefix, req_keywords, requir
     # Match trim keywords
     listing_text = f"{model} {car_trim}".upper()
     if req_keywords:
-        if not any(k.upper() in listing_text for k in req_keywords):
+        if not all(k.upper() in listing_text for k in req_keywords):
             return False
             
     # Match AWD
@@ -628,7 +660,7 @@ def main():
                 "Mark Levinson Premium Sound",
                 "Available or inbound unit that is not already sold/reserved"
             ],
-            "required_trim_keywords": ["base", "premium", "luxury", "f sport", "f-sport", "350"],
+            "required_trim_keywords": [],
             "requires_awd": True,
             "requires_hybrid": False
         }
