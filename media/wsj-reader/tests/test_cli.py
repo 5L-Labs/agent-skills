@@ -8,7 +8,9 @@ from wsj_reader.cli import main
 
 
 @responses.activate
-def test_headlines_cli_defaults_to_homepage_without_cookie(monkeypatch, tmp_path, fx, capsys):
+def test_headlines_cli_defaults_to_homepage_without_cookie(
+    monkeypatch, tmp_path, fx, capsys
+):
     monkeypatch.setenv("WSJ_CACHE_DIR", str(tmp_path))
     monkeypatch.delenv("WSJ_COOKIE", raising=False)
     responses.add(
@@ -47,7 +49,7 @@ def test_headlines_cli_rejects_homepage_audio_only(capsys):
     assert "--audio-only requires --via=graphql" in captured.err
 
 
-def test_refresh_cookie_cli_invokes_browser_helper(monkeypatch, capsys):
+def test_refresh_cookie_cli_invokes_browser_helper(monkeypatch, tmp_path, capsys):
     captured_args = {}
 
     def fake_refresh(**kwargs):
@@ -56,16 +58,18 @@ def test_refresh_cookie_cli_invokes_browser_helper(monkeypatch, capsys):
 
     monkeypatch.setattr("wsj_reader.cli.refresh_cookie_with_browser", fake_refresh)
 
-    rc = main([
-        "refresh-cookie",
-        "https://www.wsj.com/finance/test",
-        "--profile-dir",
-        "/tmp/wsj-profile",
-        "--headless",
-        "--timeout",
-        "3",
-        "--dry-run",
-    ])
+    rc = main(
+        [
+            "refresh-cookie",
+            "https://www.wsj.com/finance/test",
+            "--profile-dir",
+            str(tmp_path),
+            "--headless",
+            "--timeout",
+            "3",
+            "--dry-run",
+        ]
+    )
 
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
@@ -75,7 +79,7 @@ def test_refresh_cookie_cli_invokes_browser_helper(monkeypatch, capsys):
     assert payload["cookie_count"] == 2
     assert captured_args == {
         "url": "https://www.wsj.com/finance/test",
-        "profile_dir": "/tmp/wsj-profile",
+        "profile_dir": str(tmp_path),
         "headless": True,
         "timeout_s": 3,
         "write": False,
