@@ -27,3 +27,8 @@
 **Vulnerability:** Found `requests.get` and `requests.Session().get` calls receiving external URLs without explicit HTTP/HTTPS scheme validation, leading to potential SSRF and Local File Read (e.g., `file://`).
 **Learning:** While `bandit` rule B310 correctly flags `urllib.request.urlopen()` for SSRF, it currently has a blind spot and does not flag `requests` usage. We must manually audit for `requests` in addition to standard `urllib` usage.
 **Prevention:** Explicitly validate URL schemes when fetching remote resources via `requests` (e.g., `url.lower().startswith(("http://", "https://"))`). Add `# nosec B310` to indicate manual validation.
+
+## 2024-05-18 - Avoid hardcoded temp directories in tests
+**Vulnerability:** Probable insecure usage of temp file/directory. (Bandit B108)
+**Learning:** Hardcoded paths like `/tmp/wsj-profile` were being used in tests, which is flagged by Bandit as a medium-severity security issue because it represents an insecure usage of temporary file/directory that could be vulnerable to symlink attacks or race conditions on shared systems.
+**Prevention:** Use Pytest's built-in `tmp_path` fixture to generate secure, dynamic, and isolated temporary path strings instead of hardcoding `/tmp/...`.
