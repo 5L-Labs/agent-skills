@@ -27,3 +27,8 @@
 **Vulnerability:** Found `requests.get` and `requests.Session().get` calls receiving external URLs without explicit HTTP/HTTPS scheme validation, leading to potential SSRF and Local File Read (e.g., `file://`).
 **Learning:** While `bandit` rule B310 correctly flags `urllib.request.urlopen()` for SSRF, it currently has a blind spot and does not flag `requests` usage. We must manually audit for `requests` in addition to standard `urllib` usage.
 **Prevention:** Explicitly validate URL schemes when fetching remote resources via `requests` (e.g., `url.lower().startswith(("http://", "https://"))`). Add `# nosec B310` to indicate manual validation.
+
+## 2026-08-07 - [MEDIUM] Insecure usage of temp file/directory in tests
+**Vulnerability:** A hardcoded temporary directory path (`/tmp/wsj-profile`) was used in `test_cli.py`, flagged by Bandit as B108.
+**Learning:** Using hardcoded string paths like `/tmp/...` for temporary directories in tests can create collision risks on shared hosts and could potentially allow local users to read or overwrite test-related temporary data.
+**Prevention:** Always use dynamic test isolation fixtures (like Pytest's `tmp_path`) to generate temporary paths dynamically in test environments.
