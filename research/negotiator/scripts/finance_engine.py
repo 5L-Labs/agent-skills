@@ -3,10 +3,10 @@
 Production-Grade Generic Auto Lease & Finance Negotiation Engine
 Supports:
 - Closed-form True $0 Drive-Off (Sign & Drive) lease calculation with NY State/Jurisdiction tax capitalization
-- Multiple Security Deposit (MSD) optimization with money factor discount and guaranteed ROI
+- Multiple Security Deposit (MSD) optimization with money factor discount and guaranteed annualized ROI
 - Full 100% OTD Amortization Financing with custom APRs and terms
 - Multi-tier target bid generation (Floor / Sweet Spot / Ceiling)
-- JSON and Markdown export
+- Dynamic JSON and Markdown export adhering strictly to input parameters
 """
 
 import argparse
@@ -59,8 +59,8 @@ class AutoFinanceEngine:
         Calculates exact lease numbers with True $0 Drive-Off in NY State
         (Sales tax levied strictly on the sum of payments and capitalized).
         """
-        # Apply MSD discount
-        effective_mf = max(0.00001, base_mf - (msds * self.msd_mf_discount))
+        # Apply MSD discount (preserve exact 0.0 MF if zero/subsidized, reject negative)
+        effective_mf = max(0.0, base_mf - (msds * self.msd_mf_discount))
         residual_value = msrp * residual_pct
         
         # Base capitalized costs before tax
@@ -68,9 +68,6 @@ class AutoFinanceEngine:
         
         if zero_drive_off:
             # Closed-form solution for NY lease tax capitalized into payment
-            # BaseMonthly = Depreciation + Rent Charge
-            # TotalTax = (BaseMonthly * Term + doc_fee + acq_fee) * tax_rate
-            # NetCap = base_cap + TotalTax
             num = ((base_cap + (self.doc_fee + self.acq_fee) * self.tax_rate - residual_value) / term_months) + \
                   ((base_cap + (self.doc_fee + self.acq_fee) * self.tax_rate + residual_value) * effective_mf)
             den = 1.0 - self.tax_rate - (term_months * self.tax_rate * effective_mf)
@@ -79,7 +76,8 @@ class AutoFinanceEngine:
             total_tax = (base_monthly * term_months + self.doc_fee + self.acq_fee) * self.tax_rate
             monthly_tax = total_tax / term_months
             total_monthly = base_monthly + monthly_tax
-            drive_off = 0.0
+            drive_off_fees = 0.0
+            total_lease_cost = total_monthly * term_months
         else:
             # Traditional lease (Taxes and first month paid upfront at signing)
             net_cap = base_cap
@@ -89,11 +87,14 @@ class AutoFinanceEngine:
             total_tax = (base_monthly * term_months + self.doc_fee + self.acq_fee) * self.tax_rate
             monthly_tax = 0.0
             total_monthly = base_monthly
-            drive_off = total_monthly + total_tax + self.gov_fee
+            drive_off_fees = total_monthly + total_tax + self.gov_fee
+            # Net lease cost is total payments plus upfront taxes and fees (avoiding double counting first payment)
+            total_lease_cost = (total_monthly * (term_months - 1)) + drive_off_fees
 
         # 1 MSD unit is monthly payment rounded up to nearest $50 increment
         msd_unit = math.ceil(total_monthly / 50.0) * 50.0
         total_msd_deposit = msd_unit * msds
+        total_due_at_signing = drive_off_fees + total_msd_deposit
 
         return {
             "term_months": term_months,
@@ -107,8 +108,9 @@ class AutoFinanceEngine:
             "monthly_tax": round(monthly_tax, 2),
             "total_monthly": round(total_monthly, 2),
             "total_tax": round(total_tax, 2),
-            "drive_off": round(drive_off, 2),
-            "total_lease_cost": round(total_monthly * term_months + drive_off, 2)
+            "drive_off_fees": round(drive_off_fees, 2),
+            "total_due_at_signing": round(total_due_at_signing, 2),
+            "total_lease_cost": round(total_lease_cost, 2)
         }
 
     def generate_full_matrix(
@@ -129,11 +131,15 @@ class AutoFinanceEngine:
         if msd_options is None:
             msd_options = [0, 6]
         if finance_terms is None:
+            # 48m/60m promotional captive APRs (4.99%/5.49%) and 72m standard tier (6.49%)
             finance_terms = [(48, 4.99), (60, 5.49), (72, 6.49)]
             
         report = {
             "msrp": msrp,
             "tax_rate_pct": round(self.tax_rate * 100, 3),
+            "doc_fee": self.doc_fee,
+            "acq_fee": self.acq_fee,
+            "gov_fee": self.gov_fee,
             "tiers": []
         }
 
@@ -153,7 +159,8 @@ class AutoFinanceEngine:
 
             # Calculate Lease Options
             for term, res in lease_terms:
-                term_key = f"{term}m_{int(res*100)}res"
+                res_pct_label = f"{round(res * 100, 2):g}"
+                term_key = f"{term}m_{res_pct_label}res"
                 tier_data["leases"][term_key] = {}
                 
                 # Base zero-MSD baseline cost for ROI calculation
@@ -191,43 +198,63 @@ class AutoFinanceEngine:
 
 def format_markdown_report(data: Dict[str, Any], vehicle_name: str = "Vehicle") -> str:
     msrp = data["msrp"]
+    tax_rate = data.get("tax_rate_pct", 8.875)
+    doc_fee = data.get("doc_fee", 175.0)
+    
     md = f"# 📱 {vehicle_name} — Generic Negotiation & Financial Matrix\n"
-    md += f"**Benchmark MSRP**: **${msrp:,.2f}** | **Tax Jurisdiction**: **{data['tax_rate_pct']}% Tax** | **Doc Fee**: **$175.00**\n\n"
+    md += f"**Benchmark MSRP**: **${msrp:,.2f}** | **Tax Jurisdiction**: **{tax_rate}% Tax** | **Doc Fee**: **${doc_fee:,.2f}**\n\n"
+    
+    if not data.get("tiers"):
+        return md
+
+    # Dynamically derive lease columns from the first tier
+    first_tier = data["tiers"][0]
+    lease_term_keys = list(first_tier.get("leases", {}).keys())
     
     md += "### 🎯 1. Lease Matrix (True $0 Drive-Off / Sign & Drive)\n"
-    md += "| Negotiation Tier | Selling Price | 36 Mo / 15k Mi (0 MSD) | 36 Mo (6 MSDs) | 48 Mo (0 MSD) | 48 Mo (6 MSDs) |\n"
-    md += "| :--- | :---: | :---: | :---: | :---: | :---: |\n"
     
-    for t in data["tiers"]:
-        # Find any 36m and 48m term dynamically
-        l36_data = {}
-        l48_data = {}
-        for k, v in t["leases"].items():
-            if k.startswith("36m"):
-                l36_data = v
-            elif k.startswith("48m"):
-                l48_data = v
-                
-        l36_0 = l36_data.get("0_msd", {})
-        l36_6 = l36_data.get("6_msd", {})
-        l48_0 = l48_data.get("0_msd", {})
-        l48_6 = l48_data.get("6_msd", {})
-        
-        p36_0 = f"${l36_0.get('total_monthly', 0):,.2f}" if l36_0 else "N/A"
-        p36_6 = f"${l36_6.get('total_monthly', 0):,.2f}" if l36_6 else "N/A"
-        p48_0 = f"${l48_0.get('total_monthly', 0):,.2f}" if l48_0 else "N/A"
-        p48_6 = f"${l48_6.get('total_monthly', 0):,.2f}" if l48_6 else "N/A"
-        
-        md += f"| **{t['tier_name']}** | **${t['selling_price']:,.2f}** | **{p36_0}** | **{p36_6}** | **{p48_0}** | **{p48_6}** |\n"
+    # Build dynamic lease headers
+    lease_headers = ["Negotiation Tier", "Selling Price"]
+    lease_sub_keys = []
+    for lk in lease_term_keys:
+        msd_keys = list(first_tier["leases"][lk].keys())
+        for mk in msd_keys:
+            msd_count = mk.split("_")[0]
+            msd_label = f"({msd_count} MSDs)" if msd_count != "0" else "(0 MSD)"
+            term_label = lk.replace("res", "% Res").replace("m_", " Mo / ")
+            lease_headers.append(f"{term_label} {msd_label}")
+            lease_sub_keys.append((lk, mk))
 
-    md += "\n### 🏦 2. Finance Matrix (True $0 Down / 100% Financed OTD)\n"
-    md += "| Negotiation Tier | Selling Price | Total OTD Financed | 48 Mo (4.99%) | 60 Mo (5.49%) | 72 Mo (6.49%) |\n"
-    md += "| :--- | :---: | :---: | :---: | :---: | :---: |\n"
+    md += "| " + " | ".join(lease_headers) + " |\n"
+    md += "| " + " | ".join([":---"] + [":---:"] * (len(lease_headers) - 1)) + " |\n"
+
     for t in data["tiers"]:
-        f48 = t["finances"].get("48m_4.99apr", {}).get("monthly_payment", 0)
-        f60 = t["finances"].get("60m_5.49apr", {}).get("monthly_payment", 0)
-        f72 = t["finances"].get("72m_6.49apr", {}).get("monthly_payment", 0)
-        md += f"| **{t['tier_name']}** | **${t['selling_price']:,.2f}** | **${t['purchase_otd']:,.2f}** | **${f48:,.2f}** | **${f60:,.2f}** | **${f72:,.2f}** |\n"
+        row = [f"**{t['tier_name']}**", f"**${t['selling_price']:,.2f}**"]
+        for lk, mk in lease_sub_keys:
+            cell_data = t["leases"].get(lk, {}).get(mk, {})
+            val = f"${cell_data.get('total_monthly', 0):,.2f}" if cell_data else "N/A"
+            row.append(f"**{val}**")
+        md += "| " + " | ".join(row) + " |\n"
+
+    # Dynamically derive finance columns from the first tier
+    finance_term_keys = list(first_tier.get("finances", {}).keys())
+    md += "\n### 🏦 2. Finance Matrix (True $0 Down / 100% Financed OTD)\n"
+    
+    finance_headers = ["Negotiation Tier", "Selling Price", "Total OTD Financed"]
+    for fk in finance_term_keys:
+        f_data = first_tier["finances"][fk]
+        finance_headers.append(f"{f_data['term_months']} Mo ({f_data['apr']}%)")
+    
+    md += "| " + " | ".join(finance_headers) + " |\n"
+    md += "| " + " | ".join([":---"] + [":---:"] * (len(finance_headers) - 1)) + " |\n"
+
+    for t in data["tiers"]:
+        row = [f"**{t['tier_name']}**", f"**${t['selling_price']:,.2f}**", f"**${t['purchase_otd']:,.2f}**"]
+        for fk in finance_term_keys:
+            f_cell = t["finances"].get(fk, {})
+            val = f"${f_cell.get('monthly_payment', 0):,.2f}" if f_cell else "N/A"
+            row.append(f"**{val}**")
+        md += "| " + " | ".join(row) + " |\n"
 
     return md
 
@@ -236,14 +263,21 @@ def main():
     parser.add_argument("--msrp", type=float, required=True, help="Vehicle MSRP sticker price")
     parser.add_argument("--name", type=str, default="Target Vehicle", help="Vehicle Label / Description")
     parser.add_argument("--tax-rate", type=float, default=0.08875, help="Sales tax rate (default 0.08875)")
+    parser.add_argument("--doc-fee", type=float, default=175.0, help="Doc fee (default 175.0)")
     parser.add_argument("--acq-fee", type=float, default=650.0, help="Lease acquisition fee ($650 TFS / $795 LFS)")
+    parser.add_argument("--gov-fee", type=float, default=285.0, help="Government registration/plates fee (default 285.0)")
     parser.add_argument("--mf", type=float, default=0.00220, help="Base Tier 1 Money Factor (default 0.00220)")
     parser.add_argument("--res36", type=float, default=0.58, help="36-month residual percentage (default 0.58)")
     parser.add_argument("--res48", type=float, default=0.50, help="48-month residual percentage (default 0.50)")
     parser.add_argument("--json", action="store_true", help="Output raw JSON instead of markdown")
     args = parser.parse_args()
 
-    engine = AutoFinanceEngine(tax_rate=args.tax_rate, acq_fee=args.acq_fee)
+    engine = AutoFinanceEngine(
+        tax_rate=args.tax_rate,
+        doc_fee=args.doc_fee,
+        acq_fee=args.acq_fee,
+        gov_fee=args.gov_fee
+    )
     data = engine.generate_full_matrix(
         msrp=args.msrp,
         base_mf=args.mf,
