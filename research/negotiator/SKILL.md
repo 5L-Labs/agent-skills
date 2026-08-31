@@ -24,7 +24,7 @@ This skill requires the following Python libraries:
 *   `requests`
 *   `python-dotenv`
 
-## How to Run
+## 1. Running the Pricing Benchmark Tool
 
 Execute the tool via Python:
 
@@ -39,15 +39,19 @@ python scripts/negotiator_tool.py --price <QUOTED_PRICE> [ --vin <VIN> ] [ --mak
 *   `--model`: (Optional) The vehicle model (e.g., Grand Highlander, Pacifica, TX).
 *   `--trim`: (Optional) The trim level (e.g., Pinnacle AWD, Hybrid MAX Platinum AWD).
 
-## Example Output
+## 2. Running the Generic Lease & Finance Calculator
 
-The script outputs two tables formatted inside a markdown block that fit perfectly on mobile screens:
+Execute the generic financial engine for True $0 Drive-Off lease math, MSD optimization, and 100% OTD finance amortization:
 
-1.  **Quote vs. Benchmarks**: Compares the quoted OTD against the cheapest comparable unit found in the database, and against our baseline target vehicles (Pacifica, Grand Highlander, Lexus TX).
-2.  **Negotiation Bid Targets**: Outlines specific, actionable price bids:
-    *   **Midpoint (50% Spread)**: The halfway point between the dealer's quote and the cheapest market price.
-    *   **Cheapest Market (100%)**: The lowest price listed in the market for this exact trim.
-    *   **Aggressive (-10% Market)**: 10% below the cheapest market price, useful for low-balling or initiating a tough push.
+```bash
+python scripts/finance_engine.py --msrp <MSRP> [ --name <NAME> ] [ --tax-rate <RATE> ] [ --acq-fee <ACQ> ] [ --res36 <RES36> ] [ --res48 <RES48> ] [ --json ]
+```
+
+### Key Capabilities:
+*   **True $0 Drive-Off Lease Math**: Closed-form solution for NY State capitalized lease taxes.
+*   **MSD Optimizer**: Computes refundable security deposit amounts, Money Factor buy-down steps, and annualized guaranteed ROI.
+*   **100% OTD Amortization**: Generates 48/60/72-month financing schedules.
+*   **Multi-Tier Matrices**: Produces Floor (-10%), Sweet Spot (-7.5%), and Ceiling (-5%) pocket cheat sheets.
 
 ## Post-Sale Warranty (VSC) & Protection Contacts
 
