@@ -106,7 +106,7 @@ Env overrides: `WAYTOAGI_TRANSLATE_HOST`, `WAYTOAGI_TRANSLATE_MODEL`, `WAYTOAGI_
 waytoagi update-log --flatten | waytoagi-translate.py ... | waytoagi_content.py --host http://192.168.100.10:11434 --model qwen3.8
 ```
 
-External link note: the reader's default render drops `link` attribs (external URLs). `waytoagi_content.py` re-decodes them so they survive translation. Content + translation are cached by URL (`WAYTOAGI_CONTENT_CACHE`, default `$XDG_CACHE_HOME/waytoagi-content`); `--batch-chars` controls translation chunk size (default `WAYTOAGI_BATCH_CHARS` or 2000 source chars).
+External link note: the reader's default render drops `link` attribs (external URLs). `waytoagi_content.py` re-decodes them so they survive translation. Content + translation are cached by URL (`WAYTOAGI_CONTENT_CACHE`, default `$XDG_CACHE_HOME/waytoagi-content`); `--batch-chars` controls translation chunk size (default `WAYTOAGI_BATCH_CHARS` or 32000 source chars — sized for the model's 64k context so articles translate in 1 request, never truncated).
 
 ## Tests
 

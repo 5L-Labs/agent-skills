@@ -21,7 +21,7 @@ Env:
     WAYTOAGI_TRANSLATE_HOST  default http://192.168.100.10:11434
     WAYTOAGI_TRANSLATE_MODEL default qwen3.8
     WAYTOAGI_CONTENT_CACHE   default $XDG_CACHE_HOME/waytoagi-content
-    WAYTOAGI_BATCH_CHARS     default 2000 (zh chars per translation batch)
+    WAYTOAGI_BATCH_CHARS     default 32000 (zh chars per translation batch; model ctx 64k)
     WAYTOAGI_MAX_ARTICLES    default 0 = unlimited
 """
 from __future__ import annotations
@@ -173,7 +173,7 @@ def _needs_translation(s: str) -> bool:
 
 
 def _batch_chars() -> int:
-    return int(os.environ.get("WAYTOAGI_BATCH_CHARS", "2000"))
+    return int(os.environ.get("WAYTOAGI_BATCH_CHARS", "32000"))
 
 
 def _post(host, model, lines, timeout):
@@ -184,7 +184,7 @@ def _post(host, model, lines, timeout):
             {"role": "user", "content": "Translate to English:\n\n" + "\n".join(lines)},
         ],
         "temperature": 0.1,
-        "max_tokens": 4000,
+        "max_tokens": 16000,
         "stream": False,
     }
     req = urllib.request.Request(
@@ -203,19 +203,19 @@ def _translate_text(host, model, text):
     if not _needs_translation(text):
         return text
     batch_chars = _batch_chars()
-    # split into paragraphs, group by budget
+    # split into lines (render_page_body joins blocks with \n), group by budget
     chunks = []
     cur = []
     cur_len = 0
-    for para in text.split("\n\n"):
+    for para in text.split("\n"):
         pl = len(para)
         if cur and cur_len + pl > batch_chars:
-            chunks.append("\n\n".join(cur))
+            chunks.append("\n".join(cur))
             cur, cur_len = [], 0
         cur.append(para)
         cur_len += pl
     if cur:
-        chunks.append("\n\n".join(cur))
+        chunks.append("\n".join(cur))
     out = []
     for c in chunks:
         lines = [f"[0] {c}"]

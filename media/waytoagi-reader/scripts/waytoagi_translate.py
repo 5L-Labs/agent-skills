@@ -5,7 +5,7 @@ Reads `waytoagi update-log --flatten` JSON on stdin, batch-translates every Chin
 `title` and `summary` through a local OpenAI-compatible server (default qwen3.8),
 and writes the same document to stdout with `title_en` / `summary_en` siblings.
 
-Batching (chunks of 10) makes this ~10x faster than per-string calls. Fully
+Batching (chunks of 50) makes this ~50x faster than per-string calls. Fully
 deterministic with a filesystem translation cache, so re-runs over stable input
 are near-instant and cheap.
 
@@ -86,7 +86,7 @@ def _post(host: str, model: str, lines: list[str], timeout: int) -> str:
             {"role": "user", "content": "Translate to English:\n\n" + "\n".join(lines)},
         ],
         "temperature": 0.1,
-        "max_tokens": 2000,
+        "max_tokens": 4000,
         "stream": False,
     }
     req = urllib.request.Request(
@@ -114,7 +114,7 @@ def _translate_batch(host: str, model: str, texts: list[tuple[int, str]], use_ca
                 out[i] = hit
 
     remaining = [(i, t) for i, t in todo if i not in out]
-    chunk_size = 10
+    chunk_size = 50
     for start in range(0, len(remaining), chunk_size):
         chunk = remaining[start:start + chunk_size]
         lines = [f"[{i}] {t}" for i, t in chunk]
