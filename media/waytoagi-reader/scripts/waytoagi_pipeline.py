@@ -22,6 +22,21 @@ import sys
 import time
 
 WTR = "/opt/data/repos/agent-skills/media/waytoagi-reader"
+# Sibling helper scripts (translate/content) live in the SAME directory as this
+# pipeline — in the consumption skill dir (/opt/data/skills/.../scripts/), NOT
+# under the repo's scripts/ dir. Resolve them relative to this file so the
+# prep works regardless of which copy is invoked.
+SCRIPTS = os.path.dirname(os.path.abspath(__file__))
+# The waytoagi_reader package lives at <waytoagi-reader dir>/src. The cron venv
+# (/opt/hermes/.venv) does NOT have it installed (only the system python does),
+# so we must put the reader src on PYTHONPATH for whichever interpreter runs us.
+# The reader dir is the parent of scripts/; its src/ sits beside scripts/.
+READER_SRC = os.path.join(os.path.dirname(SCRIPTS), "src")
+PY = sys.executable  # inherit the interpreter that launched us (cron venv, etc.)
+# Merge env so subprocesses can import waytoagi_reader from the consumption copy.
+SUBENV = dict(os.environ)
+SUBENV["PYTHONPATH"] = READER_SRC + (os.pathsep + SUBENV["PYTHONPATH"]
+                                     if SUBENV.get("PYTHONPATH") else "")
 HOST = os.environ.get("WAYTOAGI_TRANSLATE_HOST", "http://lunarbeacon.newyork.nicklange.family:11434")
 MODEL = os.environ.get("WAYTOAGI_TRANSLATE_MODEL", "qwen3.8")
 OUT = {  # scope -> (output_path, translate args)
@@ -39,6 +54,7 @@ TIMEOUTS = {
 
 
 def run(cmd, **kw):
+    kw.setdefault("env", SUBENV)
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
@@ -52,7 +68,7 @@ def main(argv=None) -> int:
     t0 = time.time()
 
     # 1. fetch flat
-    r = run(["python3", "-m", "waytoagi_reader.cli", "update-log", "--flatten", "--no-cache"],
+    r = run([PY, "-m", "waytoagi_reader.cli", "update-log", "--flatten", "--no-cache"],
             cwd=WTR, timeout=TIMEOUTS["fetch"][scope])
     if r.returncode != 0 or not r.stdout.strip():
         print(f"[err] fetch failed: {r.stderr[-300:]}", file=sys.stderr)
@@ -60,7 +76,7 @@ def main(argv=None) -> int:
     flat = r.stdout
 
     # 2. translate titles/summaries
-    tr = run(["python3", f"{WTR}/scripts/waytoagi_translate.py",
+    tr = run([PY, f"{SCRIPTS}/waytoagi_translate.py",
               "--host", HOST, "--model", MODEL] + trans_extra,
              input=flat, timeout=TIMEOUTS["translate"][scope])
     if tr.returncode != 0:
@@ -69,7 +85,7 @@ def main(argv=None) -> int:
     print(f"[info] {scope}: titles/summaries translated in {time.time()-t0:.0f}s", file=sys.stderr)
 
     # 3. full article content + translate (the heavy part; this script IS the long runner)
-    fc = run(["python3", f"{WTR}/scripts/waytoagi_content.py",
+    fc = run([PY, f"{SCRIPTS}/waytoagi_content.py",
               "--host", HOST, "--model", MODEL],
              input=tr.stdout, timeout=TIMEOUTS["content"][scope])
     if fc.returncode != 0:
