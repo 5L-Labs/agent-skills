@@ -44,7 +44,7 @@ python scripts/negotiator_tool.py --price <QUOTED_PRICE> [ --vin <VIN> ] [ --mak
 Execute the generic financial engine for True $0 Drive-Off lease math, MSD optimization, and 100% OTD finance amortization:
 
 ```bash
-python scripts/finance_engine.py --msrp <MSRP> [ --name <NAME> ] [ --mf <MF> ] [ --tax-rate <RATE> ] [ --doc-fee <FEE> ] [ --acq-fee <ACQ> ] [ --res36 <RES36> ] [ --res48 <RES48> ] [ --json ]
+python scripts/finance_engine.py --msrp <MSRP> [ --name <NAME> ] [ --mf <MF> ] [ --tax-rate <RATE> ] [ --doc-fee <FEE> ] [ --gov-fee <GOV> ] [ --acq-fee <ACQ> ] [ --res36 <RES36> ] [ --res48 <RES48> ] [ --json ]
 ```
 
 ### Parameters:
@@ -53,6 +53,7 @@ python scripts/finance_engine.py --msrp <MSRP> [ --name <NAME> ] [ --mf <MF> ] [
 *   `--mf`: (Optional) Base Tier 1 Money Factor (default `0.00220`).
 *   `--tax-rate`: (Optional) Sales tax rate (default `0.08875` for Yonkers NY).
 *   `--doc-fee`: (Optional) Document processing fee (default `$175.00` NY cap).
+*   `--gov-fee`: (Optional) Government registration/title/plates fee (default `$285.00` NY DMV).
 *   `--acq-fee`: (Optional) Captive lease acquisition fee (default `$650.00` TFS / `$795.00` LFS).
 *   `--res36`: (Optional) 36-month residual percentage (default `0.58`).
 *   `--res48`: (Optional) 48-month residual percentage (default `0.50`).
