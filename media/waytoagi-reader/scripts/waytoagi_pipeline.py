@@ -6,12 +6,15 @@ article content -> translate bodies) and writes the enriched JSON to disk for a
 downstream cron LLM to format/deliver.
 
 Usage:
-    waytoagi_pipeline.py daily   # -> /tmp/wt_daily_full.json
-    waytoagi_pipeline.py weekly  # -> /tmp/wt_week_full.json
+    waytoagi_pipeline.py daily   # -> $WAYTOAGI_OUT_DIR/wt_daily_full.json
+    waytoagi_pipeline.py weekly  # -> $WAYTOAGI_OUT_DIR/wt_week_full.json
 
-Both write /tmp/wt_<scope>_full.json. The cron LLM reads that file and formats
-the digest — it never runs the heavy chain itself, so it stays under the
-foreground timeout and never needs to background/self-approve.
+Output goes to a DURABLE, non-skill directory (default
+/opt/data/cache/waytoagi) — never /tmp, which is wiped on container restart,
+and never inside the skill dir, which the nightly consumption rebuild deletes.
+The cron LLM reads that file and formats the digest — it never runs the heavy
+chain itself, so it stays under the foreground timeout and never needs to
+background/self-approve.
 """
 from __future__ import annotations
 
@@ -25,7 +28,7 @@ from pathlib import Path
 
 from waytoagi_translate import _needs_translation
 
-WTR = str(Path(__file__).resolve().parents[1])
+WTR = os.environ.get("WAYTOAGI_READER_DIR") or str(Path(__file__).resolve().parents[1])
 # Sibling helper scripts (translate/content) live in the SAME directory as this
 # pipeline — in the consumption skill dir (/opt/data/skills/.../scripts/), NOT
 # under the repo's scripts/ dir. Resolve them relative to this file so the
@@ -35,7 +38,7 @@ SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 # (/opt/hermes/.venv) does NOT have it installed (only the system python does),
 # so we must put the reader src on PYTHONPATH for whichever interpreter runs us.
 # The reader dir is the parent of scripts/; its src/ sits beside scripts/.
-READER_SRC = os.path.join(os.path.dirname(SCRIPTS), "src")
+READER_SRC = os.path.join(os.environ.get("WAYTOAGI_READER_DIR") or os.path.dirname(SCRIPTS), "src")
 PY = sys.executable  # inherit the interpreter that launched us (cron venv, etc.)
 # Merge env so subprocesses can import waytoagi_reader from the consumption copy.
 SUBENV = dict(os.environ)
@@ -43,9 +46,13 @@ SUBENV["PYTHONPATH"] = READER_SRC + (os.pathsep + SUBENV["PYTHONPATH"]
                                      if SUBENV.get("PYTHONPATH") else "")
 HOST = os.environ.get("WAYTOAGI_TRANSLATE_HOST", "http://192.168.100.10:11434")
 MODEL = os.environ.get("WAYTOAGI_TRANSLATE_MODEL", "qwen3.8")
+# Durable handoff dir: survives container restarts (/tmp does not) and stays
+# OUTSIDE the skill dir (the nightly consumption rebuild wipes anything the
+# repo does not track). Override with WAYTOAGI_OUT_DIR.
+OUT_DIR = Path(os.environ.get("WAYTOAGI_OUT_DIR", "/opt/data/cache/waytoagi"))
 OUT = {  # scope -> (output_path, translate args)
-    "daily": ("/tmp/wt_daily_full.json", ["--latest-day"]),
-    "weekly": ("/tmp/wt_week_full.json", []),
+    "daily": (str(OUT_DIR / "wt_daily_full.json"), ["--latest-day"]),
+    "weekly": (str(OUT_DIR / "wt_week_full.json"), []),
 }
 
 # Per-scope subprocess timeouts (seconds). Weekly is far heavier (all items
@@ -79,6 +86,23 @@ def main(argv=None) -> int:
         return 1
     flat = r.stdout
 
+    if scope == "weekly":
+        # The 7-day section also carries section/nav links as day-less items
+        # (e.g. the 历史更新 archive mention). They are not part of the week's
+        # updates, and the archive body is enormous (17k+ zh chars), so they
+        # waste translation time and pollute the digest. Drop them.
+        try:
+            _doc = json.loads(flat)
+            _all = _doc.get("items", [])
+            _kept = [i for i in _all if i.get("day")]
+            _doc["items"] = _kept
+            flat = json.dumps(_doc, ensure_ascii=False)
+            print(f"[info] {scope}: dropped {len(_all) - len(_kept)} day-less (nav/archive) item(s)",
+                  file=sys.stderr)
+        except (ValueError, TypeError) as e:
+            print(f"[err] fetch output is not JSON: {e}", file=sys.stderr)
+            return 1
+
     # 2. translate titles/summaries
     tr = run([PY, f"{SCRIPTS}/waytoagi_translate.py",
               "--host", HOST, "--model", MODEL] + trans_extra,
@@ -109,19 +133,32 @@ def main(argv=None) -> int:
         enriched = json.loads(fc.stdout)
         if len(enriched["items"]) != len(translated["items"]):
             raise ValueError("Content stage changed item count")
+        usable = 0
         for source, item in zip(translated["items"], enriched["items"]):
             if any(item.get(key) != value for key, value in source.items() if key not in ("content_zh", "content_en")):
                 raise ValueError("Content stage changed source item")
-            if source.get("url"):
-                for field in ("content_zh", "content_en"):
-                    if not isinstance(item.get(field), str) or not item[field].strip():
-                        raise ValueError(f"Missing {field}")
+            if not source.get("url"):
+                continue
+            if item.get("content_error"):
+                # Per-article fetch/render failure. The content stage degrades
+                # instead of dying; the item falls back to title_en/summary_en.
+                print(f"[warn] {scope}: no body for {source['url']}: {item['content_error']}", file=sys.stderr)
+                continue
+            for field in ("content_zh", "content_en"):
+                if not isinstance(item.get(field), str) or not item[field].strip():
+                    raise ValueError(f"Missing {field}")
+            usable += 1
+        if not usable and any(i.get("url") for i in enriched["items"]):
+            raise ValueError("No article produced content")
+        if usable:
+            print(f"[info] {scope}: {usable} article(s) with full translated bodies", file=sys.stderr)
     except (ValueError, KeyError, TypeError) as e:
         print(f"[err] incomplete article output: {e}", file=sys.stderr)
         return 1
     print(f"[info] {scope}: content translated in {time.time()-t0:.0f}s", file=sys.stderr)
 
     output = Path(out_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=output.parent,
