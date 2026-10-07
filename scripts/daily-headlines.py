@@ -67,12 +67,16 @@ def main() -> tuple[str, int]:
             sys.executable, "-m", "wsj_reader.cli", "headlines", "--limit", "15",
         ], timeout=45, pythonpath=wsj_pypath)
         if not arts:
-            arts2, _ = _run([
+            arts2, reason2 = _run([
                 sys.executable, "-m", "wsj_reader.cli", "headlines",
                 "--via", "graphql", "--limit", "10",
             ], timeout=45, pythonpath=wsj_pypath)
             if arts2:
                 arts, reason = arts2, ""
+            elif reason2:
+                # Report the fallback's error — a real SESSION_EXPIRED there is
+                # actionable; the homepage 401 is not.
+                reason = reason2
         if arts:
             for a in arts:
                 title = a.get("headline") or a.get("title") or ""
