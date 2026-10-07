@@ -57,7 +57,8 @@ def main() -> tuple[str, int]:
     sources_attempted = 0
     sources_failed = 0
 
-    # ── WSJ (GraphQL — needs cookie + ascii-sanitized) ──
+    # ── WSJ (homepage transport preferred; graphql+cookie fallback since WSJ
+    #    put a 401 bot-wall on the cookie-free homepage, ~2026-10-01) ──
     wsj_dir = Path("/opt/data/repos/agent-skills/media/wsj-reader")
     if (wsj_dir / "src").exists():
         sources_attempted += 1
@@ -65,6 +66,13 @@ def main() -> tuple[str, int]:
         arts, reason = _run([
             sys.executable, "-m", "wsj_reader.cli", "headlines", "--limit", "15",
         ], timeout=45, pythonpath=wsj_pypath)
+        if not arts:
+            arts2, _ = _run([
+                sys.executable, "-m", "wsj_reader.cli", "headlines",
+                "--via", "graphql", "--limit", "10",
+            ], timeout=45, pythonpath=wsj_pypath)
+            if arts2:
+                arts, reason = arts2, ""
         if arts:
             for a in arts:
                 title = a.get("headline") or a.get("title") or ""
@@ -72,7 +80,7 @@ def main() -> tuple[str, int]:
                     continue
                 norm = normalize_title(title)
                 if norm not in all_stories:
-                    all_stories[norm] = {"title": title, "sources": {}, "standfirst": a.get("standfirst", "")}
+                    all_stories[norm] = {"title": title, "sources": {}, "standfirst": a.get("standfirst") or a.get("summary", "")}
                 all_stories[norm]["sources"]["WSJ"] = a.get("url", "")
         else:
             sources_failed += 1
@@ -115,7 +123,7 @@ def main() -> tuple[str, int]:
                     continue
                 norm = normalize_title(title)
                 if norm not in all_stories:
-                    all_stories[norm] = {"title": title, "sources": {}, "standfirst": a.get("standfirst", "")}
+                    all_stories[norm] = {"title": title, "sources": {}, "standfirst": a.get("standfirst") or a.get("summary", "")}
                 all_stories[norm]["sources"]["NYT"] = a.get("url", "")
         else:
             sources_failed += 1

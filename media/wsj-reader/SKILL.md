@@ -1,7 +1,7 @@
 ---
 name: wsj-reader
 description: Read Wall Street Journal homepage headlines without cookies, plus articles and publisher-narrated MP3s ("read-to-me") using the user's authenticated browser session when needed. Emits structured JSON for downstream skills. 30-day article/audio cache, 1-hour cache for headlines.
-version: 0.2.0
+version: 0.2.1
 author: Nick Lange
 license: Apache-2.0
 metadata:
@@ -87,8 +87,22 @@ The skill caches the audio-resolution call for 30 days alongside the MP3.
 
 `pip install -e ".[dev]" && pytest` — unit tests use synthetic fixtures and HTTP mocks (no live calls, no copyrighted WSJ content in the repo).
 
+## Pitfalls
+
+- **Cookie-free homepage is dead (as of ~2026-10-01).** WSJ put a 401 bot-challenge
+  wall on `https://www.wsj.com/` HTML; `headlines` default (`--via homepage`) now
+  exits 4 NETWORK on datacenter IPs. Use `--via graphql` with the cookie instead.
+- **GraphQL `--limit` ≥ 15 returns 403 → misleading `SESSION_EXPIRED` (exit 2).**
+  WSJ's gateway rejects `articleLimitPerCollection` above 10 as scraping; the cookie
+  is fine. Keep `--limit 10` or lower on the graphql transport. If you see
+  SESSION_EXPIRED only at limit 15 but not limit 10, it is this — do NOT re-paste cookies.
+- `daily-headlines.py` tries homepage first, falls back to graphql at `--limit 10`.
+
 ## Version History
 
+- 0.2.1 (2026-10-07): Homepage transport blocked (401 bot wall, ~2026-10-01);
+  documented graphql limit ceiling (≤10) and SESSION_EXPIRED false-positive.
+  daily-headlines.py gained homepage → graphql(limit 10) fallback.
 - 0.2.0 (2026-07-15): WSJ's shared-data.dowjones.io GraphQL endpoint now requires cookies.
   Added `Cookie` header to GraphQL transport. Both transports still work; the cookie
   is no longer optional for the GraphQL path.
