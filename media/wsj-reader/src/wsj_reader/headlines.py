@@ -21,7 +21,7 @@ from typing import Optional
 from ._next_data import extract_next_data, page_props
 from .audio import resolve_audio_for_id
 from .cache import Cache, TTL_HEADLINES
-from .client import NotFoundError, WSJClient
+from .client import NotFoundError, SessionExpiredError, WSJClient
 
 # --- HTML (print-edition) ------------------------------------------------
 
@@ -45,6 +45,14 @@ COLLECTION_ALIASES = {
     "breaking": "BreakingNews_1",
 }
 DEFAULT_COLLECTION = "MOST-POP-WSJ-NO-OPN_1"
+
+# The gateway rejects summaryCollectionContent requests whose
+# articleLimitPerCollection exceeds this with a bare 403 (observed threshold:
+# <=10 pass, >=15 blocked, ~2026-10-07). The base client maps any 401/403 to
+# SessionExpiredError, so a scrape-wall looks exactly like a dead cookie. When
+# a blocked limit 403s, we retry once at the ceiling instead of blaming the
+# session; a 403 AT the ceiling is then treated as genuine expiry.
+GRAPHQL_LIMIT_CEILING = 10
 
 
 def get_headlines(
@@ -256,8 +264,23 @@ def _get_headlines_via_graphql(
         f"{variables['articleLimitPerCollection']}"
     )
     payload = None if no_cache else cache.get_json("GET", cache_url, TTL_HEADLINES)
+    degraded_from = None
     if payload is None:
-        payload = client.graphql_get(SUMMARY_COLLECTION_HASH, variables, space=False)
+        try:
+            payload = client.graphql_get(SUMMARY_COLLECTION_HASH, variables, space=False)
+        except SessionExpiredError:
+            requested = variables["articleLimitPerCollection"]
+            if requested <= GRAPHQL_LIMIT_CEILING:
+                raise  # at a safe limit — the session really is the problem
+            # Scrape-wall false positive: the 403 tracked with our oversized
+            # limit, not the cookie. Retry once at the ceiling.
+            degraded_from = requested
+            variables["articleLimitPerCollection"] = GRAPHQL_LIMIT_CEILING
+            cache_url = (
+                f"{WSJClient.GRAPHQL_BASE}?op=summaryCollectionContent"
+                f"&col={collection_id}&n={GRAPHQL_LIMIT_CEILING}"
+            )
+            payload = client.graphql_get(SUMMARY_COLLECTION_HASH, variables, space=False)
         cache.set_json("GET", cache_url, payload)
 
     items = (
@@ -293,7 +316,7 @@ def _get_headlines_via_graphql(
         })
         out.append(normalized)
 
-    return {
+    result = {
         "schema_version": 1,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "via": "graphql",
@@ -301,6 +324,12 @@ def _get_headlines_via_graphql(
         "edition_date": None,
         "articles": out,
     }
+    if degraded_from is not None:
+        result["graphql_note"] = (
+            f"gateway blocked articleLimitPerCollection={degraded_from} (403); "
+            f"retried at ceiling {GRAPHQL_LIMIT_CEILING}"
+        )
+    return result
 
 
 def _normalize_graphql_item(item: dict) -> Optional[dict]:

@@ -1,7 +1,7 @@
 ---
 name: wsj-reader
 description: Read Wall Street Journal homepage headlines without cookies, plus articles and publisher-narrated MP3s ("read-to-me") using the user's authenticated browser session when needed. Emits structured JSON for downstream skills. 30-day article/audio cache, 1-hour cache for headlines.
-version: 0.2.1
+version: 0.3.0
 author: Nick Lange
 license: Apache-2.0
 metadata:
@@ -94,12 +94,14 @@ The skill caches the audio-resolution call for 30 days alongside the MP3.
   exits 4 NETWORK on datacenter IPs. Use `--via graphql` with the cookie instead.
 - **GraphQL `--limit` ≥ 15 returns 403 → misleading `SESSION_EXPIRED` (exit 2).**
   WSJ's gateway rejects `articleLimitPerCollection` above 10 as scraping; the cookie
-  is fine. Keep `--limit 10` or lower on the graphql transport. If you see
-  SESSION_EXPIRED only at limit 15 but not limit 10, it is this — do NOT re-paste cookies.
+  is fine. As of 0.3.0 the graphql transport self-heals: on a 403 above the ceiling
+  it retries once at `--limit 10` and adds a `graphql_note` to the payload. If you
+  see SESSION_EXPIRED at limit ≤ 10, THAT is a real cookie expiry — re-paste.
 - `daily-headlines.py` tries homepage first, falls back to graphql at `--limit 10`.
 
 ## Version History
 
+- 0.3.0 (2026-10-07): GraphQL transport now downshifts limit-triggered 403s and retries at ceiling 10 (`graphql_note` in payload); 403 at safe limits still raises SESSION_EXPIRED.
 - 0.2.1 (2026-10-07): Homepage transport blocked (401 bot wall, ~2026-10-01);
   documented graphql limit ceiling (≤10) and SESSION_EXPIRED false-positive.
   daily-headlines.py gained homepage → graphql(limit 10) fallback.
