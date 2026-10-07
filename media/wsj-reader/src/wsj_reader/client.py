@@ -5,10 +5,10 @@ Three transport paths:
 * HTML / JSON transport (cookies + browser-like headers) — used for article-body
   extraction and the legacy audio resolver. Subject to Datadome bot protection;
   cookies last ~24h in practice.
-* Public HTML transport (no cookies) — used for homepage headline discovery.
-* GraphQL transport — optional collection/audio metadata transport. WSJ has
-  required cookies since mid-2026, so it is no longer the default headline
-  source.
+* Public HTML transport (no cookies) — homepage headline discovery. As of
+  ~2026-10 WSJ answers this with 401 bot-challenge walls from datacenter IPs.
+* GraphQL transport — the primary headline path since the homepage wall
+  (collections + audio metadata). WSJ has required cookies here since mid-2026.
 
 The cookie is loaded lazily; only the cookie-bound transports touch it.
 """

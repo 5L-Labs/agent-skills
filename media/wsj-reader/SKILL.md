@@ -1,7 +1,7 @@
 ---
 name: wsj-reader
-description: Read Wall Street Journal homepage headlines without cookies, plus articles and publisher-narrated MP3s ("read-to-me") using the user's authenticated browser session when needed. Emits structured JSON for downstream skills. 30-day article/audio cache, 1-hour cache for headlines.
-version: 0.2.0
+description: Read WSJ headlines, articles and read-to-me audio; session cookie required.
+version: 0.3.0
 author: Nick Lange
 license: Apache-2.0
 metadata:
@@ -13,13 +13,13 @@ metadata:
 
 # wsj-reader
 
-Programmatic WSJ access. Homepage headlines are public and cookie-free; article bodies and URL-based audio resolution use the user's logged-in session cookies. Exposes three CLI commands; all emit JSON for consumption by other agents/skills.
+Programmatic WSJ access. Headline collections come from WSJ's authenticated GraphQL gateway (the cookie-free homepage scrape was bot-walled with 401s ~2026-10-01); article bodies and URL-based audio resolution use the same logged-in session cookies. Exposes CLI commands emitting JSON for consumption by other agents/skills.
 
 ## When to Use — natural-language → command
 
 | User says… | Run |
 |---|---|
-| "today's WSJ", "what's on the front page" | `wsj headlines` |
+| "today's WSJ", "what's on the front page" | `wsj headlines --via=graphql --limit 10` |
 | "WSJ print edition headlines" | `wsj headlines --via=html` |
 | "WSJ business section today" | `wsj headlines --via=html --section business` |
 | "read the WSJ article at <url>" | `wsj article <url>` |
@@ -27,7 +27,7 @@ Programmatic WSJ access. Homepage headlines are public and cookie-free; article 
 
 ## Setup
 
-**One-time, by the human** for article/audio URL access (requires a browser):
+**One-time, by the human** — required for headlines (graphql), article/audio URL access (requires a browser):
 
 1. Sign in to https://www.wsj.com.
 2. DevTools → **Network** → click any `www.wsj.com` request → copy the full `Cookie:` header value.
@@ -48,7 +48,7 @@ When an authenticated command prints `SESSION_EXPIRED` (exit code 2), repeat the
 ## Agent invocation
 
 ```bash
-wsj headlines                                 # public homepage headlines, no cookie
+wsj headlines --via=graphql --limit 10          # recommended path (cookie required)
 wsj headlines --via=html --date 20260608       # specific print-edition date, requires cookie
 wsj headlines --via=html --section business --limit 5
 wsj headlines --via=graphql --collection most-popular --limit 5
@@ -87,8 +87,26 @@ The skill caches the audio-resolution call for 30 days alongside the MP3.
 
 `pip install -e ".[dev]" && pytest` — unit tests use synthetic fixtures and HTTP mocks (no live calls, no copyrighted WSJ content in the repo).
 
+## Pitfalls
+
+- **Cookie-free homepage is dead (as of ~2026-10-01).** WSJ put a 401 bot-challenge
+  wall on `https://www.wsj.com/` HTML; `headlines` default (`--via homepage`) now
+  exits 4 NETWORK on datacenter IPs. Use `--via graphql` with the cookie instead.
+- **GraphQL `--limit` > 10 risks a 403 → misleading `SESSION_EXPIRED` (exit 2).**
+  WSJ's gateway treats `articleLimitPerCollection` above the ceiling 10 as scraping
+  (verified: 3/5/10 pass, 15/20 blocked; 11–14 untested — the ceiling is the highest
+  verified-safe value). The cookie is fine. As of 0.3.0 the graphql transport
+  self-heals: on a 403 above the ceiling it retries once at `--limit 10` and adds a
+  `graphql_note` to the payload. If you see SESSION_EXPIRED at limit ≤ 10, THAT is
+  a real cookie expiry — re-paste.
+- `daily-headlines.py` tries homepage first, falls back to graphql at `--limit 10`.
+
 ## Version History
 
+- 0.3.0 (2026-10-07): GraphQL transport now downshifts limit-triggered 403s and retries at ceiling 10 (`graphql_note` in payload); 403 at safe limits still raises SESSION_EXPIRED.
+- 0.2.1 (2026-10-07): Homepage transport blocked (401 bot wall, ~2026-10-01);
+  documented graphql limit ceiling (≤10) and SESSION_EXPIRED false-positive.
+  daily-headlines.py gained homepage → graphql(limit 10) fallback.
 - 0.2.0 (2026-07-15): WSJ's shared-data.dowjones.io GraphQL endpoint now requires cookies.
   Added `Cookie` header to GraphQL transport. Both transports still work; the cookie
   is no longer optional for the GraphQL path.
