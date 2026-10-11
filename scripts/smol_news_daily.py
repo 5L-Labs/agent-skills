@@ -69,9 +69,16 @@ def _newest_item(xml_text, title_prefix=None):
         if not pd_str:
             continue
         try:
-            pd = datetime.strptime(pd_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
-        except ValueError:
+            from email.utils import parsedate_to_datetime
+            pd = parsedate_to_datetime(pd_str)
+        except (ValueError, TypeError):
             continue
+        if pd is None:
+            continue
+        if pd.tzinfo is None:
+            pd = pd.replace(tzinfo=timezone.utc)
+        else:
+            pd = pd.astimezone(timezone.utc)
         if best is None or pd > best[0]:
             best = (pd, t, it.findtext("link"), it.findtext("description"))
     return best
@@ -101,6 +108,10 @@ def latest_issue():
             continue
         if item:
             candidates.append(item)
+        else:
+            print(f"WARN: {label} feed fetched OK but yielded no usable items"
+                  f"{' (title prefix mismatch?)' if prefix else ''}.",
+                  file=sys.stderr)
 
     if not candidates:
         print("ERROR: No parseable AINews items in any feed.", file=sys.stderr)
@@ -185,9 +196,12 @@ def main():
     print(f"Date: {pd.strftime('%Y-%m-%d')} ({pd.strftime('%a, %d %b %Y %H:%M:%S GMT')})")
     print(f"Title: {title}")
     print(f"URL: {link}")
-    for note in (staleness_note(pd), repeat_note(link, pd)):
-        if note:
-            print(note)
+    # Emit at most one NOTE line (documented output contract: downstream
+    # consumers parse NOTE:). The repeat note is strictly more specific than
+    # the staleness note, so it wins when both apply.
+    note = repeat_note(link, pd) or staleness_note(pd)
+    if note:
+        print(note)
     record_dispatch(link, pd)
     print("--- content ---")
     content = full_content(link)
