@@ -27,7 +27,7 @@ All commands print one JSON object to stdout with `"schema_version": 1`. Errors 
 
 ## Required environment
 
-Optional for default `wsj headlines`; required for `wsj article`, `wsj audio <url>`, `wsj headlines --via=graphql`, and `wsj headlines --via=html`: `WSJ_COOKIE` — full browser Cookie header in `.env` or process env. Optional: `WSJ_CACHE_DIR`, `WSJ_REQUEST_SPACING_MS` (default 400, range 100–5000), `WSJ_MAX_FETCHES` (default 200), `WSJ_USER_AGENT`.
+Required for `wsj article`, `wsj audio <url>`, and the recommended headline path `wsj headlines --via=graphql`; also for `wsj headlines --via=html`. The bare `wsj headlines` default (homepage scrape) is bot-walled with 401s since ~2026-10-01: `WSJ_COOKIE` — full browser Cookie header in `.env` or process env. Optional: `WSJ_CACHE_DIR`, `WSJ_REQUEST_SPACING_MS` (default 400, range 100–5000), `WSJ_MAX_FETCHES` (default 200), `WSJ_USER_AGENT`.
 
 Optional for `wsj refresh-cookie`: install the browser extra and Chromium with `pip install -e ".[browser]" && python -m playwright install chromium`. The helper uses `WSJ_BROWSER_PROFILE_DIR` or `~/.wsj-reader-browser` for the persistent browser profile.
 

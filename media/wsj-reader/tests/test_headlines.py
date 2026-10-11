@@ -304,3 +304,81 @@ def test_headlines_graphql_sends_cookie(monkeypatch, tmp_path):
     out = get_headlines(via="graphql")
     assert out["via"] == "graphql"
     assert out["articles"] == []
+
+
+# ─── GraphQL scrape-wall (limit-triggered 403) ───────────────────────────
+
+import json as _json
+from urllib.parse import unquote
+
+from wsj_reader.client import SessionExpiredError
+
+
+def _gql_limit_requested(request) -> int:
+    m = re.search(r'"articleLimitPerCollection":(\d+)', unquote(request.url))
+    assert m, f"limit not found in {request.url}"
+    return int(m.group(1))
+
+
+@responses.activate
+def test_graphql_scrape_wall_403_downshifts_to_ceiling(fake_env):
+    """403 at limit>10 is treated as scrape-wall, retried at 10 — not SESSION_EXPIRED."""
+    payload = _graphql_payload([
+        _gql_item(f"WP-WSJ-000000000{i}", f"https://www.wsj.com/test-{i}", f"H{i}")
+        for i in range(1, 11)
+    ])
+
+    def cb(request):
+        if _gql_limit_requested(request) > 10:
+            return 403, {}, "{}"
+        return 200, {"Content-Type": "application/json"}, _json.dumps(payload)
+
+    responses.add_callback(
+        responses.GET,
+        re.compile(r"https://shared-data\.dowjones\.io/gateway/graphql.*"),
+        callback=cb,
+    )
+    responses.add(
+        responses.GET,
+        re.compile(r"https://video-api\.shdsvc\.dowjones\.io/.*"),
+        json={}, status=404,
+    )
+    out = get_headlines(via="graphql", limit=15, no_cache=True)
+    assert len(out["articles"]) <= 10
+    assert "graphql_note" in out and "blocked" in out["graphql_note"]
+    # First call (n=15) got the 403, second (n=10) succeeded.
+    limits = [_gql_limit_requested(c.request) for c in responses.calls
+              if "shared-data" in c.request.url]
+    assert limits == [15, 10]
+
+
+@responses.activate
+def test_graphql_403_at_safe_limit_still_session_expired(fake_env):
+    """A 403 with a limit <= ceiling is a genuine session problem — must raise."""
+    responses.add(
+        responses.GET,
+        re.compile(r"https://shared-data\.dowjones\.io/gateway/graphql.*"),
+        json={}, status=403,
+    )
+    with pytest.raises(SessionExpiredError):
+        get_headlines(via="graphql", limit=10, no_cache=True)
+
+
+@responses.activate
+def test_graphql_clean_success_has_no_degradation_note(fake_env, monkeypatch):
+    monkeypatch.setenv("WSJ_REQUEST_SPACING_MS", "100")
+    responses.add(
+        responses.GET,
+        re.compile(r"https://shared-data\.dowjones\.io/gateway/graphql.*"),
+        json=_graphql_payload([
+            _gql_item("WP-WSJ-0000000001", "https://www.wsj.com/test-1", "H1"),
+        ]),
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        re.compile(r"https://video-api\.shdsvc\.dowjones\.io/.*"),
+        json={}, status=404,
+    )
+    out = get_headlines(via="graphql", limit=15, no_cache=True)
+    assert "graphql_note" not in out
