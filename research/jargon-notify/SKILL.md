@@ -1,6 +1,6 @@
 ---
 name: jargon-notify
-description: Poll the jargon registry for new terms and post them to a Discord channel. Maintains a git-tracked state file so only genuinely new terms trigger notifications.
+description: Poll the jargon registry for new terms and post them to a Discord channel. Maintains a persistent state file so only genuinely new terms trigger notifications.
 version: 1.0.0
 author: Hermes Agent 01
 license: MIT
@@ -12,7 +12,7 @@ metadata:
 
 # Jargon Notify
 
-Watches the jargon registry for new terms and posts kindergarten-level definitions to a designated Discord channel. Designed to run as a cron job — stateless between runs, with all tracking in a git-committed state file.
+Watches the jargon registry for new terms and posts kindergarten-level definitions to a designated Discord channel. Designed to run as a cron job — stateless between runs, with all tracking in a persistent state file.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ Registry (write source)      State file (read source)      Discord (output)
         │                           │                          │
 ┌───────▼────────┐          ┌───────▼──────────┐       ┌───────▼──────┐
 │ jargon-registry │          │ posted-terms.json │       │ channel ID   │
-│ .json           │          │ (git-tracked)     │       │ 15151903...  │
+│ .json           │          │ (NOT git-tracked) │       │ 15151903...  │
 └───────┬────────┘          └───────┬──────────┘       └───────▲──────┘
         │                           │                          │
         └───────────┬───────────────┘                          │
@@ -36,6 +36,8 @@ Registry (write source)      State file (read source)      Discord (output)
 ## State File
 
 Location: `<jargon-skill>/references/posted-terms.json`
+
+IMPORTANT: this file is NOT git-tracked. The agent-skills repo gitignores `**/posted-terms.json` and deliberately untracked runtime state files (commit 33b3090, "chore: untrack runtime state files from git"). Write it to both the repo working tree and the consumption dir; never attempt `git add` (it will be refused by .gitignore, which is correct). The repo copy is primary for reads; a fresh clone starts with an empty/missing state file, and the first-run seed logic in Step 1 handles that by seeding all registry terms without notifying.
 
 ```json
 {
@@ -115,17 +117,9 @@ Write the updated state to BOTH locations:
 1. `/opt/data/repos/agent-skills/research/jargon/references/posted-terms.json` (git repo, primary)
 2. `/opt/data/skills/research/jargon/references/posted-terms.json` (consumption dir, immediate availability for next cron run)
 
-### Step 5: Commit to git
+### Step 5: No git commit
 
-Commit the updated state file in the agent-skills repo:
-```bash
-git -C /opt/data/repos/agent-skills add research/jargon/references/posted-terms.json
-git -C /opt/data/repos/agent-skills commit -m "jargon-notify: posted N new terms to Discord"
-```
-
-Use `5L-hermes01` identity (user.name = "5L-hermes01", user.email = "hermes1@5l-labs.com").
-
-Push is optional — the nightly sync script will pick it up and push with any other changes.
+Do NOT commit the state file — the repo intentionally gitignores `**/posted-terms.json` (runtime state, never in source control). Writing to both locations in Step 4 is the entire persistence story. If you find yourself tempted to `git add -f`, stop: repo policy is explicit. The edge-case table below already documented the fallback; this is not a failure to work around, it is the design.
 
 ## Cron Job
 
@@ -149,8 +143,8 @@ Set to `deliver: local` instead of `origin` to test without notifying the user. 
 - **jargon skill**: must have `jargon-registry.json` in its references directory
 - **send_message tool**: required for Discord posting (available by default)
 - **write_file tool**: required for state file updates
-- **terminal tool**: required for git commits
-- **agent-skills repo**: must be cloned at `/opt/data/repos/agent-skills/` with git identity configured
+- **terminal tool**: required for the diff computation and CLI send
+- **agent-skills repo**: must be cloned at `/opt/data/repos/agent-skills/` (state file lives in its working tree, NOT in git)
 
 ## Discord Channel
 
@@ -162,21 +156,22 @@ To change, update the send_message target in Step 3.
 
 | Scenario | Behavior |
 |----------|----------|
-| No new terms | [SILENT] — no message, no git commit |
+| No new terms | [SILENT] — no message, no state update |
 | State file missing | Create seeded with all current registry terms (no notification) |
 | Registry missing | Error — log and exit, don't touch state |
 | Registry term deleted | Nothing — we only detect additions, not removals |
 | Discord send fails | Log error, don't update state (term will retry next run) |
-| Git commit fails | Non-fatal — state file is still written, nightly sync will pick it up |
-| Consumption dir stale | State is read from agent-skills repo as primary source of truth |
+| git add attempted | Refused by .gitignore — correct, do not force. Step 4 write is the whole persistence story |
+| Consumption dir stale | State is read from agent-skills repo working tree as primary source of truth |
 
 ## Pitfalls
 
-- The consumption directory (`/opt/data/skills/`) is rebuilt nightly from upstream + agent-skills originals. Writing state to the consumption dir is a convenience copy — the agent-skills repo holds the real state.
+- The consumption directory (`/opt/data/skills/`) is rebuilt nightly from upstream + agent-skills originals. Writing state to the consumption dir is a convenience copy — the agent-skills repo working tree holds the real state (a fresh clone of the repo will NOT contain posted-terms.json; first-run seed logic handles that).
 - New terms enter the registry via digest pipelines (x-digest, hn-brief-digest, arxiv). If those pipelines aren't running, no new terms will appear here.
 - The registry uses the term acronym as the JSON key (e.g., `"BERT"`, not lowercase). The diff is case-sensitive — `"Bert"` won't match `"BERT"`.
 - If a term is added to the registry and the cron fires before the state file diff picks it up, no problem — it'll get posted on the next tick.
 
 ## Version History
 
-- 1.0.0 (2026-06-13): Initial skill. Polls jargon registry, diffs against git-tracked posted-terms.json, posts new terms to Discord.
+- 1.1.0 (2026-10-11): Corrected persistence model — posted-terms.json is NOT git-tracked (repo gitignores runtime state files by design since 33b3090). Removed the git-commit step; state lives in the repo working tree + consumption dir.
+- 1.0.0 (2026-06-13): Initial skill. Polls jargon registry, diffs against posted-terms.json, posts new terms to Discord.
