@@ -6,7 +6,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -121,6 +121,55 @@ def main() -> tuple[str, int]:
             sources_failed += 1
             lines.append(f"[NYT: failed — {reason}]")
 
+    # ── Cross-day dedup: skip stories surfaced in the last 7 days ──
+    # FT's /structure/v14 pins top stories for weeks (some appeared 11× in
+    # 46 days); this keeps the digest fresh while the source feeds lag.
+    SEEN_STATE = Path("/opt/data/repos/agent-skills/data/seen_headlines.json")
+    SEEN_WINDOW_DAYS = 7
+    cutoff = (datetime.now(timezone.utc).date() - timedelta(days=SEEN_WINDOW_DAYS)).isoformat()
+
+    def _load_seen() -> set[str]:
+        if not SEEN_STATE.exists():
+            return set()
+        try:
+            data = json.loads(SEEN_STATE.read_text())
+        except Exception:
+            return set()
+        return {u["url"] for u in data if u.get("first_seen", "") >= cutoff}
+
+    def _record_seen(stories: list[dict]) -> None:
+        today = datetime.now(timezone.utc).date().isoformat()
+        cur: list[dict] = []
+        if SEEN_STATE.exists():
+            try:
+                cur = json.loads(SEEN_STATE.read_text())
+            except Exception:
+                cur = []
+        cur = [u for u in cur if u.get("first_seen", "") >= cutoff]
+        seen_urls = {u["url"] for u in cur}
+        for s in stories:
+            for u in s["sources"].values():
+                if u and u not in seen_urls:
+                    cur.append({"url": u, "first_seen": today})
+                    seen_urls.add(u)
+        tmp = SEEN_STATE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(cur))
+        os.replace(tmp, SEEN_STATE)
+
+    seen = _load_seen()
+    dropped = 0
+    if seen and all_stories:
+        before = dict(all_stories)
+        for norm in list(all_stories):
+            if any(u in seen for u in all_stories[norm]["sources"].values() if u):
+                del all_stories[norm]
+                dropped += 1
+        if not all_stories:
+            all_stories = before  # repeat beats empty — never ship an empty digest
+            dropped = 0
+    if dropped:
+        lines.append(f"[dedup: {dropped} previously-seen storie(s) skipped]")
+
     # If every attempted source failed, exit non-zero so the cron job marks as error.
     all_failed = sources_attempted > 0 and sources_failed == sources_attempted
 
@@ -165,6 +214,8 @@ def main() -> tuple[str, int]:
         lines.append(f"{i}. {story['title']} {sources}")
         if story["standfirst"]:
             lines.append(f"   {story['standfirst']}")
+
+    _record_seen(sorted_stories)
 
     if len(lines) <= 2:
         output = ""  # silent — nothing to report
