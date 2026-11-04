@@ -6,6 +6,13 @@
       "spec": "references/validation-spec.md",
       "last_validated": null,
       "last_result": null
+    },
+    {
+      "skill": "jira",
+      "last_change": "2026-11-04",
+      "spec": "references/validation-spec.md",
+      "last_validated": null,
+      "last_result": null
     }
   ]
 }
