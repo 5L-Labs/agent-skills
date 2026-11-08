@@ -1,0 +1,12 @@
+pyproject.toml
+src/pressreader_toc/__init__.py
+src/pressreader_toc/client.py
+src/pressreader_toc/errors.py
+src/pressreader_toc/normalize.py
+src/pressreader_toc.egg-info/PKG-INFO
+src/pressreader_toc.egg-info/SOURCES.txt
+src/pressreader_toc.egg-info/dependency_links.txt
+src/pressreader_toc.egg-info/entry_points.txt
+src/pressreader_toc.egg-info/requires.txt
+src/pressreader_toc.egg-info/top_level.txt
+tests/test_normalize.py

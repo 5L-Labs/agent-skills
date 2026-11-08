@@ -1,0 +1,4 @@
+news-reader-base @ file:../news-reader-base
+
+[dev]
+pytest>=7

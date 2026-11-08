@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pressreader-toc"
+version = "0.1.0"
+description = "Fetch and normalize the FT print edition table-of-contents from PressReader, then map stories to ft.com URLs."
+license = {text = "Apache-2.0"}
+authors = [{name = "Nick Lange"}]
+requires-python = ">=3.10"
+dependencies = [
+    "news-reader-base @ file:../news-reader-base",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+prtoc = "pressreader_toc.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
