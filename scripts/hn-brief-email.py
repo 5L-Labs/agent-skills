@@ -142,21 +142,30 @@ def resolve_env(cli_env: dict[str, str]) -> dict[str, str]:
     return env
 
 
-def try_senders(subject: str, body: str, to: str, env: dict[str, str]) -> tuple[str, str | None]:
+def have_sender(env: dict[str, str]) -> bool:
+    """True when at least one send path looks provisioned."""
+    if env.get("EMAIL_ADDRESS") and env.get("EMAIL_PASSWORD"):
+        return True
+    if shutil.which("msmtp"):
+        return True
+    return bool(env.get("HN_MAIL_SSH_HOST"))
+
+
+def try_senders(subject: str, body: str, to: str, env: dict[str, str]) -> tuple[str, str]:
     errors = []
     if env.get("EMAIL_ADDRESS") and env.get("EMAIL_PASSWORD"):
         try:
-            return send_smtp(subject, body, to, env), None
+            return send_smtp(subject, body, to, env), ""
         except Exception as exc:  # noqa: BLE001
             errors.append(f"smtp: {exc}")
     try:
-        return send_msmtp_local(subject, body, to, env.get("EMAIL_FROM")), None
+        return send_msmtp_local(subject, body, to, env.get("EMAIL_FROM")), ""
     except Exception as exc:  # noqa: BLE001
         errors.append(f"msmtp: {exc}")
     ssh_host = env.get("HN_MAIL_SSH_HOST")
     if ssh_host:
         try:
-            return send_msmtp_ssh(subject, body, to, ssh_host, env.get("EMAIL_FROM")), None
+            return send_msmtp_ssh(subject, body, to, ssh_host, env.get("EMAIL_FROM")), ""
         except Exception as exc:  # noqa: BLE001
             errors.append(f"ssh-msmtp: {exc}")
     return "", "; ".join(errors) or "no sender configured"
@@ -200,6 +209,11 @@ def main() -> int:
         return 0
 
     env = resolve_env({})
+    if not have_sender(env):
+        # No email channel provisioned yet — log and stay silent rather than
+        # firing a failure notice every day. Real send errors still exit 2.
+        log(f"NOT SENT {day['date']}: no email channel configured")
+        return 0
     how, err = try_senders(subject, body, args.to, env)
     if how:
         log(f"sent {day['date']} to {args.to} via {how} ({len(body)} chars)")
