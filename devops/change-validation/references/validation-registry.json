@@ -8,12 +8,11 @@
       "last_result": null
     },
     {
-      "skill": "waytoagi-reader",
-      "last_change": "2026-09-27",
+      "skill": "hn-brief-dataset",
+      "last_change": "2026-11-22",
       "spec": "references/validation-spec.md",
       "last_validated": null,
-      "last_result": null,
-      "note": "Validate nightly rebuild survival + durable output dir on next daily (10:00) and weekly (16:00) delivery"
+      "last_result": null
     }
   ]
 }
