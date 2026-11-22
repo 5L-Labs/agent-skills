@@ -79,6 +79,13 @@ over reading JSON inline: the daily file is ~60 KB and the digest alone is
 - The digest-email job (`scripts/hn-brief-email.py`, cron 07:45 America/New_York)
   reads the same dataset — if it stops arriving, check
   `/opt/data/logs/hn-brief-email.log` before touching the dataset.
+- **This container has no email sender provisioned** (no `msmtp`/`himalaya`,
+  Hermes email platform unconfigured, host `msmtp` not reachable from the
+  container). The job logs `NOT SENT … no email channel configured` and exits 0
+  until a sender exists: drop `EMAIL_ADDRESS` / `EMAIL_PASSWORD` /
+  `EMAIL_SMTP_HOST` into `/opt/data/secrets/mail.env` (outbound
+  `smtp.gmail.com:465/587` is reachable from here), or set
+  `HN_MAIL_SSH_HOST` to reach the host's msmtp.
 
 ## References
 
