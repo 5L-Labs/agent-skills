@@ -75,11 +75,14 @@ it up, then nothing until the next day), `quality.digestValid` false, or the
 date already sent.
 
 Credentials: `SMTP_HOST`, `SMTP_PORT` (587, STARTTLS), `SMTP_USER`,
-`SMTP_PASSWORD`, `SMTP_FROM` — read from the process environment first, then
-`/opt/data/secrets/mail.env`, then `/opt/data/secrets/hermes.env`. The password
-is used only for `smtplib.login()`; it is never printed, logged, cached or
-written anywhere. With no credentials the job logs `NOT SENT … SMTP not
-configured` and exits 0 (silent, no daily failure spam).
+`SMTP_PASSWORD`, `SMTP_FROM` — or the `EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` /
+`EMAIL_PASSWORD` naming Hermes' email-platform template uses (both resolve).
+Sources, first hit wins: the process environment, `/opt/data/secrets/mail.env`,
+`/opt/data/.env` (the container's master env), `/opt/data/secrets/hermes.env` —
+commented-out lines are ignored. The password is used only for
+`smtplib.login()`; it is never printed, logged, cached or written anywhere.
+With no credentials the job logs `NOT SENT … SMTP not configured` (naming every
+location it checked) and exits 0, silent.
 
 ## Answering rules
 
@@ -116,3 +119,6 @@ configured` and exits 0 (silent, no daily failure spam).
 ## References
 
 - `references/validation-spec.md` — what a correct answer / email must contain.
+- `references/scheduled-email-job.md` — the general recipe behind the job above
+  (cron entry-point rule, credential lookup, dedupe, verify-without-sending).
+  Reuse it for any other report that has to be emailed on a schedule.

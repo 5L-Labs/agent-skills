@@ -14,10 +14,13 @@ Exit without sending when:
 
 Credentials, first hit wins:
   1. process environment: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
-  2. /opt/data/secrets/mail.env            (same keys, KEY=VALUE lines)
-  3. /opt/data/secrets/hermes.env          (same keys)
-SMTP_PASSWORD is only ever read into memory for smtplib.login() — it is never
-echoed, logged, cached, or written to any file.
+     (EMAIL_SMTP_HOST / EMAIL_ADDRESS / EMAIL_PASSWORD also accepted — that is
+     the naming Hermes' email platform template uses)
+  2. /opt/data/secrets/mail.env            (KEY=VALUE lines)
+  3. /opt/data/.env                        (master env for this container)
+  4. /opt/data/secrets/hermes.env
+Commented-out lines are ignored. SMTP_PASSWORD is only ever read into memory for
+smtplib.login() — it is never echoed, logged, cached, or written to any file.
 
 Usage
 -----
@@ -45,11 +48,23 @@ DATA_ROOT = Path("/opt/shared_space/hn-brief-data")
 CACHE_DIR = Path("/opt/data/cache/hn-brief-email")
 LOG = Path("/opt/data/logs/hn-brief-email.log")
 STATE = Path("/opt/data/state/hn-brief-email.last-sent.json")
-SECRET_FILES = [Path("/opt/data/secrets/mail.env"), Path("/opt/data/secrets/hermes.env")]
+CRED_SOURCES = (
+    Path("/opt/data/secrets/mail.env"),
+    Path("/opt/data/.env"),
+    Path("/opt/data/secrets/hermes.env"),
+)
 NY = ZoneInfo("America/New_York")
 DEFAULT_TO = "nick.lange@gmail.com"
 MAX_HEADLINES = 20
-SMTP_KEYS = ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM")
+# canonical key -> accepted names in priority order (SMTP_* first, then the
+# EMAIL_* naming Hermes' email platform template ships with)
+KEY_ALIASES: dict[str, tuple[str, ...]] = {
+    "SMTP_HOST": ("SMTP_HOST", "EMAIL_SMTP_HOST"),
+    "SMTP_PORT": ("SMTP_PORT", "EMAIL_SMTP_PORT"),
+    "SMTP_USER": ("SMTP_USER", "EMAIL_ADDRESS", "EMAIL_USER"),
+    "SMTP_PASSWORD": ("SMTP_PASSWORD", "EMAIL_PASSWORD"),
+    "SMTP_FROM": ("SMTP_FROM", "EMAIL_FROM", "EMAIL_ADDRESS", "EMAIL_HOME_ADDRESS"),
+}
 
 
 def log(msg: str) -> None:
@@ -79,16 +94,25 @@ def parse_env_file(path: Path) -> dict[str, str]:
 
 
 def smtp_config() -> dict[str, str]:
-    """Collect SMTP_* from the process env, then the secret store. No logging of values."""
-    found: dict[str, str] = {}
-    for path in SECRET_FILES:
+    """Resolve SMTP settings from the process env, then the env/secret files.
+
+    Accepts SMTP_* names and the EMAIL_* names Hermes' email-platform template
+    uses (see KEY_ALIASES). Values are never logged.
+    """
+    raw: dict[str, str] = {}
+    for path in CRED_SOURCES:
         for key, val in parse_env_file(path).items():
-            if key in SMTP_KEYS and key not in found:
-                found[key] = val
-    for key in SMTP_KEYS:  # process env wins
-        if os.environ.get(key):
-            found[key] = os.environ[key]
-    return found
+            raw.setdefault(key, val)  # first file wins per exact name
+    for key, val in os.environ.items():  # process env wins
+        if val:
+            raw[key] = val
+    cfg: dict[str, str] = {}
+    for canon, names in KEY_ALIASES.items():
+        for name in names:
+            if raw.get(name):
+                cfg[canon] = raw[name]
+                break
+    return cfg
 
 
 # ── rendering ────────────────────────────────────────────────────────────────
@@ -242,7 +266,8 @@ def main() -> int:
     missing = [k for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD") if not cfg.get(k)]
     if missing:
         log(f"NOT SENT {date}: SMTP not configured (missing {', '.join(missing)}); "
-            f"expected SMTP_* in the environment or {SECRET_FILES[0]}")
+            f"expected SMTP_* (or EMAIL_*) in the process env or one of "
+            f"{', '.join(str(p) for p in CRED_SOURCES)}")
         return 0
 
     try:
