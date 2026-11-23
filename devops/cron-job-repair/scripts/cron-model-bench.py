@@ -39,6 +39,13 @@ ARMS: dict[str, dict[str, list[str]]] = {
     "qwen": {"edit": ["--model", "qwen3.8-27b-instruct", "--provider", "ollama-qwen3.6:27b", "--pin"]},
     # local inference box, small inkling
     "inkling": {"edit": ["--model", "inkling-mini", "--provider", "ollama-qwen3.6:27b", "--pin"]},
+    # cheaper hosted candidates (prices are USD per million tokens, from the live
+    # /v1/models pricing block; ":batch" variants bill at a discount)
+    "v41batch": {"edit": ["--model", "deepseek/deepseek-v4.1-flash:batch", "--provider", "nous", "--pin"]},
+    "qwen37f": {"edit": ["--model", "qwen/qwen3.7-flash", "--provider", "nous", "--pin"]},
+    "glmflash": {"edit": ["--model", "~z-ai/glm-flash-latest", "--provider", "nous", "--pin"]},
+    "oss120b": {"edit": ["--model", "openai/gpt-oss-120b:batch", "--provider", "nous", "--pin"]},
+    "hy4flash": {"edit": ["--model", "tencent/hy4-flash", "--provider", "nous", "--pin"]},
 }
 
 

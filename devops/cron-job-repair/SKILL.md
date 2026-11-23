@@ -76,6 +76,12 @@ scripts are.
   `hermes cron run <id>` → confirm a **new** row in `usage_audit.jsonl`
   (`error: null`, sane `duration_ms`) → restore the real delivery target.
   `local` delivery means verification never posts to Signal/Discord.
+- **Check `response_silent` and the output size, not just the exit code.** A model
+  swap can turn a job into a silent no-op: a cheap model read a prompt that says
+  "respond `[SILENT]` if there is nothing to report", skipped the work, and finished
+  `ok` in 30s using a twentieth of the usual tokens with `response_silent: true`.
+  Exit status said success; nothing was delivered. A job that normally produces a
+  large digest is only fixed when it produces a large digest again.
 - `hermes cron run` may exit non-zero while still having fired — the audit row is
   the truth, not the exit code. Wait on the log, not the command.
 - Model cold-load on a local box can add minutes to a run; a run that looks
