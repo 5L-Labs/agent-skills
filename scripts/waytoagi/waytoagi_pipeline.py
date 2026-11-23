@@ -150,6 +150,8 @@ def main(argv=None) -> int:
             if len(enriched["items"]) != len(translated["items"]):
                 raise ValueError("Content stage changed item count")
             usable = 0
+            capped = 0
+            limited = scope == "weekly" and WEEKLY_CONTENT_LIMIT > 0
             for source, item in zip(translated["items"], enriched["items"]):
                 if any(item.get(key) != value for key, value in source.items() if key not in ("content_zh", "content_en")):
                     raise ValueError("Content stage changed source item")
@@ -162,13 +164,28 @@ def main(argv=None) -> int:
                     continue
                 for field in ("content_zh", "content_en"):
                     if not isinstance(item.get(field), str) or not item[field].strip():
+                        if limited:
+                            # The body cap means most items are intentionally left
+                            # with title/summary only. Mark them the same way a
+                            # fetch failure is marked so the validator accepts the
+                            # run instead of discarding every body it did get.
+                            item["content_error"] = (
+                                f"beyond the weekly body cap ({WEEKLY_CONTENT_LIMIT} articles)")
+                            capped += 1
+                            break
                         raise ValueError(f"Missing {field}")
-                usable += 1
+                else:
+                    usable += 1
             if not usable and any(i.get("url") for i in enriched["items"]):
                 raise ValueError("No article produced content")
             if usable:
                 print(f"[info] {scope}: {usable} article(s) with full translated bodies", file=sys.stderr)
-            payload = fc.stdout
+            if capped:
+                enriched["content_capped"] = capped
+                enriched["content_cap_limit"] = WEEKLY_CONTENT_LIMIT
+                print(f"[info] {scope}: {capped} article(s) beyond the {WEEKLY_CONTENT_LIMIT}-article "
+                      f"body cap (title/summary only)", file=sys.stderr)
+            payload = json.dumps(enriched, ensure_ascii=False)
         except (ValueError, KeyError, TypeError) as e:
             print(f"[err] incomplete article output: {e}", file=sys.stderr)
         if payload is not None:
