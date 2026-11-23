@@ -81,13 +81,16 @@ date already sent.
 
 Credentials: `SMTP_HOST`, `SMTP_PORT` (587, STARTTLS), `SMTP_USER`,
 `SMTP_PASSWORD`, `SMTP_FROM` — or the `EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` /
-`EMAIL_PASSWORD` naming Hermes' email-platform template uses (both resolve).
-Sources, first hit wins: the process environment, `/opt/data/secrets/mail.env`,
-`/opt/data/.env` (the container's master env), `/opt/data/secrets/hermes.env` —
-commented-out lines are ignored. The password is used only for
-`smtplib.login()`; it is never printed, logged, cached or written anywhere.
-With no credentials the job logs `NOT SENT … SMTP not configured` (naming every
-location it checked) and exits 0, silent.
+`EMAIL_PASSWORD` naming Hermes' email platform uses (both resolve). Sources, in
+order: `/opt/data/secrets/mail.env`, `/opt/data/.env` (the container's master
+env), `/opt/data/secrets/hermes.env`, and only then the process environment as a
+fallback — **files win**, because the process env is a snapshot from gateway
+start and a stale value there must not shadow the corrected file (run
+`scripts/smtp-diagnose.py` to see which source each key came from). Commented-out
+lines are ignored. The password is used only for `smtplib.login()`; it is never
+printed, logged, cached or written anywhere. With no credentials the job logs
+`NOT SENT … SMTP not configured` (naming every location it checked) and exits 0,
+silent.
 
 ## Answering rules
 
@@ -126,6 +129,12 @@ location it checked) and exits 0, silent.
   `SMTP_PASSWORD` produces exactly this 535.
 - The scripts here are canonical; the repo copy under
   `research/hn-brief-dataset/` is what the nightly rebuild restores.
+- **Deployment trap:** the nightly sync hard-resets the repo's `main` to
+  `origin/main`, so a local commit of new skill files is discarded before the
+  sync looks for changes. New skills must be committed to a *pushed* feature
+  branch (upstream PR) **and** left as untracked files in the repo working tree —
+  the rebuild copies the working tree, and the sync stages untracked files onto
+  its `update/local-<date>` branch.
 
 ## References
 

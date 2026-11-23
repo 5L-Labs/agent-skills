@@ -21,7 +21,6 @@ from pathlib import Path
 
 EMAIL_SCRIPT = Path(__file__).with_name("hn-brief-email.py")
 
-
 def load_email_module():
     spec = importlib.util.spec_from_file_location("hn_brief_email", EMAIL_SCRIPT)
     mod = importlib.util.module_from_spec(spec)

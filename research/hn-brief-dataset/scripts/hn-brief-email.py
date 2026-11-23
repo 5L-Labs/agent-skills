@@ -53,6 +53,7 @@ CRED_SOURCES = (
     Path("/opt/data/.env"),
     Path("/opt/data/secrets/hermes.env"),
 )
+CRED_SOURCE_OF: dict[str, str] = {}  # key -> where its value came from (never the value)
 NY = ZoneInfo("America/New_York")
 DEFAULT_TO = "nick.lange@gmail.com"
 MAX_HEADLINES = 20
@@ -94,23 +95,33 @@ def parse_env_file(path: Path) -> dict[str, str]:
 
 
 def smtp_config() -> dict[str, str]:
-    """Resolve SMTP settings from the process env, then the env/secret files.
+    """Resolve SMTP settings from the env/secret files, then the process env.
 
     Accepts SMTP_* names and the EMAIL_* names Hermes' email-platform template
-    uses (see KEY_ALIASES). Values are never logged.
+    uses (see KEY_ALIASES).
+
+    **File first, process env last.** The files are what the operator edits; the
+    process environment is a snapshot taken when the gateway started, so a stale
+    value there (e.g. an old placeholder pasted before the real app password)
+    must not shadow the corrected file. Values are never logged; the source file
+    of each key is recorded in CRED_SOURCE_OF for diagnostics.
     """
     raw: dict[str, str] = {}
     for path in CRED_SOURCES:
         for key, val in parse_env_file(path).items():
-            raw.setdefault(key, val)  # first file wins per exact name
-    for key, val in os.environ.items():  # process env wins
-        if val:
+            if val and key not in raw:
+                raw[key] = val
+                CRED_SOURCE_OF[key] = str(path)
+    for key, val in os.environ.items():  # fallback only
+        if val and key not in raw:
             raw[key] = val
+            CRED_SOURCE_OF[key] = "process env"
     cfg: dict[str, str] = {}
     for canon, names in KEY_ALIASES.items():
         for name in names:
             if raw.get(name):
                 cfg[canon] = raw[name]
+                CRED_SOURCE_OF[canon] = CRED_SOURCE_OF.get(name, "?")
                 break
     return cfg
 
