@@ -14,6 +14,13 @@
       "last_validated": null,
       "last_result": null,
       "note": "Validate nightly rebuild survival + durable output dir on next daily (10:00) and weekly (16:00) delivery"
+    },
+    {
+      "skill": "security-manifest-audit",
+      "last_change": "2026-11-23",
+      "spec": "references/validation-spec.md",
+      "last_validated": "2026-11-23",
+      "last_result": "pass \u2014 185/185 manifests valid, confidence >= 0.7, zero baseline notes"
     }
   ]
 }
