@@ -191,17 +191,30 @@ def send_smtp(cfg: dict[str, str], to: str, subject: str, plain: str, html_body:
     msg.set_content(plain)
     msg.add_alternative(html_body, subtype="html")
     context = ssl.create_default_context()
-    if port == 465:
-        with smtplib.SMTP_SSL(host, port, timeout=60, context=context) as smtp:
-            smtp.login(user, cfg["SMTP_PASSWORD"])
-            smtp.send_message(msg)
-    else:
-        with smtplib.SMTP(host, port, timeout=60) as smtp:
-            smtp.ehlo()
-            smtp.starttls(context=context)
-            smtp.ehlo()
-            smtp.login(user, cfg["SMTP_PASSWORD"])
-            smtp.send_message(msg)
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=60, context=context) as smtp:
+                smtp.login(user, cfg["SMTP_PASSWORD"])
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=60) as smtp:
+                smtp.ehlo()
+                smtp.starttls(context=context)
+                smtp.ehlo()
+                smtp.login(user, cfg["SMTP_PASSWORD"])
+                smtp.send_message(msg)
+    except smtplib.SMTPAuthenticationError as exc:
+        raise RuntimeError(
+            f"login rejected by {host}: {exc.smtp_code} {exc.smtp_error.decode(errors='ignore') if isinstance(exc.smtp_error, bytes) else exc.smtp_error}"
+        ) from exc
+    except smtplib.SMTPServerDisconnected as exc:
+        # Gmail closes the socket immediately after a 535, so smtplib reports a
+        # disconnect instead of the auth failure. Say what that usually means.
+        raise RuntimeError(
+            f"connection closed during AUTH on {host}:{port} — usually a rejected "
+            f"login (bad/revoked app password); run scripts/smtp-diagnose.py to read "
+            f"the server's real response code"
+        ) from exc
     return f"{host}:{port} starttls as {sender}"
 
 

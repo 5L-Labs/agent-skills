@@ -55,6 +55,11 @@ the digest alone is ~15 KB, easy to truncate or mis-parse by hand.
 `--dry-run` renders without sending, `--force` ignores the already-sent record,
 `--to` overrides the recipient (default `nick.lange@gmail.com`).
 
+`scripts/smtp-diagnose.py` — transport triage: prints the credential sources,
+banner, EHLO capabilities, STARTTLS certificate and the raw AUTH exchange with
+the server's own response codes. Never prints the password. Run it first on any
+send failure.
+
 ## Daily email job
 
 | Piece | Value |
@@ -113,6 +118,12 @@ location it checked) and exits 0, silent.
   (`/opt/data/scripts/`): a symlink resolving outside that directory is
   rejected by the cron validator as path traversal. Hence the shim; the
   implementation lives in `scripts/` of this skill so it ships with the skill.
+- **Gmail closes the socket right after a 535**, so `smtplib` reports
+  `SMTPServerDisconnected` rather than an auth failure. The job translates that
+  into "connection closed during AUTH — usually a rejected login" and logs it;
+  run `scripts/smtp-diagnose.py` to read Gmail's actual response code. A Gmail
+  app password is 16 lowercase letters — a short or placeholder value in
+  `SMTP_PASSWORD` produces exactly this 535.
 - The scripts here are canonical; the repo copy under
   `research/hn-brief-dataset/` is what the nightly rebuild restores.
 
