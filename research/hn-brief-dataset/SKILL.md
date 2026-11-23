@@ -139,6 +139,6 @@ silent.
 ## References
 
 - `references/validation-spec.md` — what a correct answer / email must contain.
-- `references/scheduled-email-job.md` — the general recipe behind the job above
-  (cron entry-point rule, credential lookup, dedupe, verify-without-sending).
-  Reuse it for any other report that has to be emailed on a schedule.
+- Skill `email-delivery` — the reusable outbound-mail recipe this job follows
+  (cron entry-point rule, credential lookup order, dedupe, verify-without-sending).
+  Load it before wiring any other scheduled mail.
