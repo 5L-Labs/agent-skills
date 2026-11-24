@@ -69,7 +69,7 @@ delivered to the Discord channel (the gateway chunks long responses).
 | Piece | Weekly | Monthly |
 |---|---|---|
 | Prep shim (real file in `HERMES_HOME/scripts/`) | `hn-brief-weekly-prep.py` | `hn-brief-monthly-prep.py` |
-| Corpus | last 7 published days, 20 headlines/day, 3000-char digest excerpt | last 30 published days, 12 headlines/day, 1500-char excerpt |
+| Corpus | last 7 published days, 20 headlines/day, 3000-char digest excerpt, each story with its own `article:` + `hn:` URL | last 30 published days, 12 headlines/day, 1500-char excerpt, same URL contract |
 | Skills | `unified-digest-themes`, `hn-brief-dataset` | same |
 | Model / provider | `qwen3.8-27b-instruct-mtp-d3-ctx131k-no-backend-sampling` / `ollama-qwen3.6:27b` (local, `http://host.containers.internal:11434/v1`) | same |
 | Toolsets | `["terminal"]` only | same |

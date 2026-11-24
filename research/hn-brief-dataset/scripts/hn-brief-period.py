@@ -105,7 +105,8 @@ def render(doc: dict, days: int, label: str) -> str:
         f"window: {w['first']} … {w['last']}  ({w['count']} published date(s) in the dataset)",
         f"save_to: {target}",
         "This is the raw material: top headlines per day + a bounded excerpt of each day's digest.",
-        "Cite the story title and its article URL for every claim.",
+        "Every story line carries its OWN article URL and its OWN HN discussion URL.",
+        "Use them verbatim, exactly as given — never invent, shorten, or reuse a URL from another story.",
         "",
     ]
     for day in doc["days"]:
@@ -116,7 +117,9 @@ def render(doc: dict, days: int, label: str) -> str:
         out.append("HEADLINES")
         for s in day["stories"]:
             out.append(f"  {s['rank']}. {s['title']} ({s['domain']}) "
-                       f"{s['points']} pts, {s['comments']} cmts — {s['url']}")
+                       f"{s['points']} pts, {s['comments']} cmts")
+            out.append(f"      article: {s['url']}")
+            out.append(f"      hn: {s['hn']}")
         out.append("")
         out.append(f"DAILY DIGEST ({day.get('digestFullChars')} chars"
                    f"{', excerpted' if day['digest'].endswith('…') else ''})")
