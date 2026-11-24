@@ -78,8 +78,9 @@ Full job/transport detail: `references/channel-delivery.md`.
 
 Skip rules (silent, exit 0): briefing date != today in America/New_York (the
 07:45 run exits quietly when the pipeline is late and the 08:15/09:15 retries
-pick it up), `quality.digestValid` false. A real transport failure exits 2 so
-`hermes cron list` shows `last_status=error`.
+pick it up), `quality.digestValid` false. A real transport failure exits 2, which
+raises a cron failure alert — every HN job carries `failure_deliver: signal`, so
+that alert lands in the Signal main channel (the DM), never in a digest channel.
 
 ## Answering rules
 

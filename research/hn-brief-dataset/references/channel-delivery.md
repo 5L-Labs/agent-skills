@@ -25,9 +25,20 @@ aggregator jobs, which summarize with the local model.
 | Cache | `/opt/data/cache/hn-brief-email/<date>.txt` and `.html` |
 | Exit | 0 on success/skip (silent); 2 on a real transport failure so `hermes cron list` shows `last_status=error` |
 
-Skip rules (silent, exit 0): briefing date != today in America/New_York
-(the 07:45 run exits quietly when the pipeline is late and the 08:15/09:15 runs
-pick it up), `quality.digestValid` false.
+Skip rules (silent, exit 0): briefing date != today in America/New_York (the
+07:45 run exits quietly when the pipeline is late and the 08:15/09:15 runs pick
+it up), `quality.digestValid` false. A real transport failure exits 2, which
+raises a cron failure alert — routed to the Signal main channel (see Failure
+routing below), not into any digest channel.
+
+## Failure routing
+
+Every HN job carries `failure_deliver: signal` — failure alerts go to the Signal
+**main channel** (the DM, `SIGNAL_HOME_CHANNEL`), never to the Daily Notices
+group and never into a Discord digest channel. The daily jobs stay
+`deliver: local` so their *success* output is silent (the script posts to Discord
+itself), while a non-zero exit still raises the failure alert. The aggregators
+deliver their digest to Discord and route only failures to Signal.
 
 Credentials, first hit wins, **files before the process env** (the process env is
 a snapshot from gateway start; a stale value there must not shadow the file):
@@ -98,6 +109,6 @@ curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
 - The pre-Aug-2026 daily job scraped `hn-brief.com` with a browser and posted a
   themed digest at 22:00 UTC. It was paused 2026-08-24 ("stop all hacker news
   jobs until I fix the underlying code") and superseded by this dataset pipeline.
-- The four paused jobs (`hn-brief-daily-digest`, `-weekly-digest`,
-  `-monthly-digest`, `-popularity-tracker`) still exist, disabled. They read the
-  old `/opt/data/cache/hn-brief/YYYY/MM/DD/` cache, not this dataset.
+- The four legacy jobs (`hn-brief-daily-digest`, `-weekly-digest`,
+  `-monthly-digest`, `-popularity-tracker`) were REMOVED on 2026-11-24. They
+  read the old `/opt/data/cache/hn-brief/YYYY/MM/DD/` cache, not this dataset.
