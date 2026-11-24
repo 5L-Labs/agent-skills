@@ -14,6 +14,15 @@
       "last_validated": null,
       "last_result": null,
       "note": "Validate nightly rebuild survival + durable output dir on next daily (10:00) and weekly (16:00) delivery"
+    },
+    {
+      "skill": "security-manifest-audit",
+      "root": "research/security-manifest-audit",
+      "last_change": "2026-11-24",
+      "spec": "references/validation-spec.md",
+      "last_validated": "2026-11-24T06:00:05Z",
+      "last_result": "pass",
+      "note": "Stage-1 static census re-run at hermes-agent a15b9710395aa1c4858fb6dd9e4c5014c5ced4e9 (185 skills). Reproduce: /usr/bin/python3 research/security-manifest-audit/scripts/generate_baseline.py --repo <checkout> --out /tmp/corpus --schema research/security-manifest-audit/references/manifest.v0.json && /usr/bin/python3 research/security-manifest-audit/scripts/validate_corpus.py --corpus /tmp/corpus --repo <checkout> && /usr/bin/python3 research/security-manifest-audit/scripts/test_generate_baseline.py. Result: pass, 0 failures, 185/185 manifests, shape narrow/medium/wide = 30/83/72, method=static, confidence=0.5, every ceiling null, no generated_at so evidence is byte-stable per commit. Tool vocabulary from toolsets.py (69 names); terminal recorded for 45 skills and execute_code for 14; all 21 delegating skills are medium or wide with delegation.verified=false. Generator regression suite 14/14. The pre-review generator's corpus fails the same gate with 569 failures (stage 185, inputs 185, tools 168, hosts 31)."
     }
   ]
 }
