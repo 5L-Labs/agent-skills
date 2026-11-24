@@ -14,8 +14,9 @@
     "commit": {"type": "string", "pattern": "^([0-9a-f]{40}|unknown)$"},
     "shape": {"enum": ["narrow", "medium", "wide"]},
     "ceiling": {
-      "enum": ["narrow", "medium", "wide"],
-      "description": "widest shape this skill may ever be granted; read by the OpenShell policy prover"
+      "type": ["string", "null"],
+      "enum": ["narrow", "medium", "wide", null],
+      "description": "widest shape this skill may ever be granted; read by the OpenShell policy prover. null until Stage 4 proves it."
     },
     "summary": {"type": "string", "minLength": 1},
     "actions": {
@@ -28,6 +29,7 @@
           "name": {"type": "string"},
           "class": {"enum": ["read", "draft", "write-shared", "irreversible"]},
           "review_gate": {"enum": ["autorun", "human"]},
+          "service": {"type": "string"},
           "notes": {"type": "string"}
         }
       }
@@ -40,7 +42,10 @@
         "additionalProperties": false,
         "properties": {
           "name": {"type": "string"},
-          "reach": {"enum": ["narrow", "medium", "wide"]},
+          "reach": {
+            "enum": ["narrow", "medium", "wide", "inherits", "unknown"],
+            "description": "inherits: delegate_task, as wide as the child's toolset, which Stage 1 does not pin"
+          },
           "provider": {"type": "string"},
           "notes": {"type": "string"}
         }
@@ -109,7 +114,7 @@
             "additionalProperties": false,
             "properties": {
               "name": {"type": "string"},
-              "downstream": {"type": "string"}
+              "syncs_to": {"type": "string"}
             }
           }
         },

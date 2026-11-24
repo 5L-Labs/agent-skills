@@ -20,9 +20,9 @@
       "root": "research/security-manifest-audit",
       "last_change": "2026-11-24",
       "spec": "references/validation-spec.md",
-      "last_validated": "2026-11-24T04:24:39Z",
+      "last_validated": "2026-11-24T05:51:39Z",
       "last_result": "pass",
-      "note": "Stage-1 static census re-run at hermes-agent a15b9710395aa1c4858fb6dd9e4c5014c5ced4e9. Reproduce with: /usr/bin/python3 research/security-manifest-audit/scripts/generate_baseline.py --repo <checkout> --out /tmp/corpus --schema research/security-manifest-audit/references/manifest.v0.json && /usr/bin/python3 research/security-manifest-audit/scripts/validate_corpus.py --corpus /tmp/corpus --repo <checkout>. Result: pass, 0 failures, 185/185 manifests, shape narrow/medium/wide = 33/89/63, method=static, confidence=0.5. The pre-review generator's corpus fails the same gate with 569 failures (stage 185, inputs 185, tools 168, hosts 31)."
+      "note": "Stage-1 static census re-run at hermes-agent a15b9710395aa1c4858fb6dd9e4c5014c5ced4e9. Reproduce with: /usr/bin/python3 research/security-manifest-audit/scripts/generate_baseline.py --repo <checkout> --out /tmp/corpus --schema research/security-manifest-audit/references/manifest.v0.json && /usr/bin/python3 research/security-manifest-audit/scripts/validate_corpus.py --corpus /tmp/corpus --repo <checkout> && /usr/bin/python3 research/security-manifest-audit/scripts/test_generate_baseline.py. Result: pass, 0 failures, 185/185 manifests, shape narrow/medium/wide = 28/82/75, method=static, confidence=0.5, all ceilings null; generator regression suite 14/14. The pre-review generator's corpus fails the same gate with 569 failures (stage 185, inputs 185, tools 168, hosts 31)."
     }
   ]
 }

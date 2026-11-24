@@ -35,6 +35,7 @@ import json
 import os
 import re
 import statistics
+import subprocess
 import sys
 
 import yaml
@@ -87,6 +88,16 @@ def check_secrets(text):
     return None
 
 
+def git_commit(repo):
+    try:
+        out = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"],
+                             capture_output=True, text=True, timeout=20)
+        sha = out.stdout.strip()
+        return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
+    except Exception:
+        return None
+
+
 def validate(corpus, schema_path, repo):
     failures = []
     manifests = corpus_manifests(corpus)
@@ -96,6 +107,7 @@ def validate(corpus, schema_path, repo):
     validator = None
     if schema and jsonschema:
         validator = jsonschema.Draft202012Validator(schema)
+    expected_commit = git_commit(repo) if repo else None
 
     covered = set()
     for m in manifests:
@@ -146,6 +158,17 @@ def validate(corpus, schema_path, repo):
                                          f"confidence {conf} exceeds cap {STAGE_CAPS[method]} for method {method}"))
         if not prov.get("inputs"):
             failures.append((rel, "inputs", "provenance.inputs missing (score not recomputable)"))
+
+        # the ceiling is what the enforcer proves; a Stage-1 draft must not claim one
+        if method == "static" and data.get("ceiling") is not None:
+            failures.append((rel, "ceiling",
+                             f"ceiling {data.get('ceiling')!r} set at method static "
+                             "(unproven; leave null until Stage 4)"))
+
+        # commit must be the audited checkout, not a literal from another run
+        if expected_commit and data.get("commit") != expected_commit:
+            failures.append((rel, "commit",
+                             f"manifest commit {data.get('commit')!r} != repo HEAD {expected_commit}"))
 
         names = {t.get("name") for t in data.get("tools") or [] if isinstance(t, dict)} - {None}
         bad = names & NEVER_TOOLS
@@ -345,7 +368,7 @@ def main(argv=None):
         "schema": schema_path if os.path.isfile(schema_path) else None,
         "jsonschema_available": bool(jsonschema),
         "checks": ["coverage", "yaml", "json", "schema", "stage", "inputs",
-                   "secrets", "tools", "hosts", "duplicates"],
+                   "ceiling", "commit", "secrets", "tools", "hosts", "duplicates"],
         "failures": [{"skill": s, "check": c, "detail": d} for s, c, d in failures],
         "failure_count": len(failures),
         "shape": dict(dist["shape"]),

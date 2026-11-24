@@ -30,6 +30,7 @@ Author: Hermes Agent 01
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime as _dt
 import glob
 import json
@@ -45,41 +46,126 @@ STAGE_CAPS = {"static": 0.5, "+review": 0.6, "+dynamic": 0.75, "+eval-backtest":
 METHOD = "static"
 
 # ---------------------------------------------------------------------------
-# Tool vocabulary: real Hermes tool names only. Names that are ordinary English
-# words (AMBIGUOUS) count only in a tool-call context; compound names may also
-# match bare. `file`, `memory`, `skills`, `web` are never tools.
+# Tool vocabulary.
+#
+# Which tool NAMES exist is read from the audited repo's `toolsets.py` at the
+# audited commit, so a new tool is picked up without editing this file. When
+# that file is missing or unparsable the built-in lists below are the fallback.
+#
+# How WIDE a tool is stays a judgement made here (the repo does not record
+# reach): the sets below classify known names, and names discovered only from
+# toolsets.py fall back to keyword hints.
+#
+# `file`, `web`, `skills`, `browser`, `process` and `sandbox` are toolset
+# names, not tools. They are dropped outright. Names that are also ordinary
+# English words (PROSE_TOOLS) count only in a tool-call context.
 # ---------------------------------------------------------------------------
 NARROW_TOOLS = {
-    "read_file", "write_file", "search_files", "patch", "skill_view", "skills_list",
-    "memory", "clarify", "session_search", "process_manage", "todo_list", "cronjob",
-    "kanban", "kanban_create", "kanban_list", "kanban_show", "kanban_complete",
+    "read_file", "write_file", "search_files", "patch", "skill_view", "skill_manage",
+    "skills_list", "memory", "clarify", "session_search", "process_manage", "todo_list",
+    "cronjob", "kanban", "kanban_create", "kanban_list", "kanban_show",
+    "kanban_complete",
 }
 MEDIUM_TOOLS = {
-    "image_generate", "image_generation", "text_to_speech", "vision_analyze",
-    "video_analyze", "video_generate", "ha_call_service", "gadget_action",
-    "gadget_display", "gadget_ask", "gadget_play", "gadget_speak", "gadget_interpret",
-    "gadget_widget", "gadget_devices", "desktop_preview", "drive_preview",
-    "focus_pane", "read_terminal", "read_window_below", "annotate_preview",
-    "set_theme", "show_tip", "gui_tour", "close_terminal", "computer_use",
+    "image_generate", "image_generation", "image_gen", "text_to_speech",
+    "vision_analyze", "vision", "video_analyze", "video_generate", "ha_call_service",
+    "gadget_action", "gadget_display", "gadget_ask", "gadget_play", "gadget_speak",
+    "gadget_interpret", "gadget_widget", "gadget_devices", "desktop_preview",
+    "desktop_project", "drive_preview", "focus_pane", "read_terminal",
+    "read_window_below", "annotate_preview", "set_theme", "show_tip", "gui_tour",
+    "close_terminal",
 }
+# computer_use drives a desktop and whatever that desktop opens: wide.
 WIDE_TOOLS = {
     "web_search", "web_extract", "browser_exec", "browser_vault", "browser_use",
-    "x_search", "manage_connections", "tool_search", "tool_call",
+    "browser_cdp", "browser_dialog", "browser_navigate", "browser_click",
+    "browser_snapshot", "x_search", "manage_connections", "manage_catalog",
+    "tool_search", "tool_call", "computer_use",
 }
-AMBIGUOUS = {
-    "terminal", "memory", "patch", "clarify", "kanban", "session_search",
-    "computer_use",
-}
-NEVER_TOOLS = {"file", "skills", "skill", "web", "browser", "process", "sandbox"}
-# delegate_task inherits the child toolset; the skill constrains it to narrow.
+SHELL_TOOLS = {"terminal", "execute_code"}
 DELEGATION_TOOLS = {"delegate_task"}
-ALL_TOOLS = NARROW_TOOLS | MEDIUM_TOOLS | WIDE_TOOLS | DELEGATION_TOOLS
-TOOL_WORDS = {
-    t: re.compile(r"(?<![\w-])" + re.escape(t) + r"(?![\w-])", re.I) for t in ALL_TOOLS
+NEVER_TOOLS = {"file", "skills", "skill", "web", "browser", "process", "sandbox"}
+PROSE_TOOLS = {
+    "terminal", "memory", "patch", "clarify", "kanban", "session_search",
+    "computer_use", "vision", "image_gen", "discord", "x_search", "search",
 }
+WIDE_HINTS = ("search", "browser", "navigate", "click", "snapshot", "extract",
+              "fetch", "http", "connect", "catalog", "manage", "web", "computer")
+MEDIUM_HINTS = ("image", "video", "speech", "tts", "vision", "camera", "gadget",
+                "desktop", "gui", "preview", "theme", "tour", "annotate", "audio",
+                "mic", "record", "feishu", "discord", "home")
+
 TOOL_VERB_RE = re.compile(
     r"\b(?:use|uses|using|via|through|call|calls|calling|invoke|invokes|invoking|"
     r"run|runs|running)\s+(?:the\s+)?$", re.I)
+
+# Filled by load_tool_vocabulary() before any scan runs.
+ALL_TOOLS: set[str] = set()
+AMBIGUOUS: set[str] = set()
+TOOL_WORDS: dict[str, re.Pattern] = {}
+TOOL_VOCAB_SOURCE = "builtin-fallback"
+
+
+def classify_reach(name: str) -> str:
+    """Reach of a tool this file did not already classify."""
+    if name in NARROW_TOOLS:
+        return "narrow"
+    if name in MEDIUM_TOOLS:
+        return "medium"
+    if name in WIDE_TOOLS:
+        return "wide"
+    for hint in WIDE_HINTS:
+        if hint in name:
+            return "wide"
+    for hint in MEDIUM_HINTS:
+        if hint in name:
+            return "medium"
+    return "narrow"
+
+
+def load_tool_vocabulary(repo: str) -> bool:
+    """Read tool names from the audited repo's toolsets.py.
+
+    Tool names are the string elements of list literals; dict keys are toolset
+    names and only feed the prose check. Returns True when the repo supplied
+    the vocabulary, False when the built-in fallback was used.
+    """
+    global ALL_TOOLS, AMBIGUOUS, TOOL_VOCAB_SOURCE
+    tools, toolsets = set(), set()
+    path = os.path.join(repo, "toolsets.py")
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                tree = ast.parse(fh.read())
+        except (OSError, SyntaxError, ValueError):
+            tree = None
+        if tree is not None:
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.List, ast.Tuple)):
+                    for el in node.elts:
+                        if isinstance(el, ast.Constant) and isinstance(el.value, str) \
+                                and re.fullmatch(r"[a-z][a-z0-9_]{1,40}", el.value):
+                            tools.add(el.value)
+                elif isinstance(node, ast.Dict):
+                    for key in node.keys:
+                        if isinstance(key, ast.Constant) and isinstance(key.value, str) \
+                                and re.fullmatch(r"[a-z][a-z0-9_]{1,40}", key.value):
+                            toolsets.add(key.value)
+    discovered = bool(tools)
+    if not discovered:
+        for group in (NARROW_TOOLS, MEDIUM_TOOLS, WIDE_TOOLS):
+            tools |= group
+        tools |= SHELL_TOOLS | DELEGATION_TOOLS
+    tools -= NEVER_TOOLS
+    ALL_TOOLS = tools
+    TOOL_WORDS.clear()
+    TOOL_WORDS.update({
+        t: re.compile(r"(?<![\w-])" + re.escape(t) + r"(?![\w-])", re.I)
+        for t in sorted(ALL_TOOLS)
+    })
+    AMBIGUOUS = (PROSE_TOOLS | toolsets) & ALL_TOOLS
+    TOOL_VOCAB_SOURCE = "toolsets.py" if discovered else "builtin-fallback"
+    return discovered
 
 # CLIs whose use implies egress from `terminal`/`execute_code`.
 NETWORK_CLIS = {
@@ -93,6 +179,16 @@ LOCAL_CLIS = {
     "python", "python3", "pip", "pip3", "jq", "ffmpeg", "git", "bash", "sh", "zsh",
     "brew", "apt", "apt-get", "systemctl", "s6-svc", "tmux", "pdftotext", "openssl",
     "gpg", "java", "sbt",
+}
+# A shell command whose destination is open-world: any host, any repo, any
+# image, any cluster. These make `terminal` wide. Package installers
+# (pip/npm/uv/apt/brew/...) are NOT here: an install is install-time, and
+# `npm run dev` reaches nothing. Network CLIs that talk to a nameable service
+# (gh, gws, stripe, curl to a fixed URL) leave `terminal` medium.
+UNBOUNDED_CLIS = {
+    "ssh", "scp", "rsync", "docker", "podman", "skopeo", "kubectl", "helm",
+    "terraform", "rclone", "aws", "gcloud", "az", "mail", "sendmail", "yt-dlp",
+    "claude", "codex", "gemini", "opencode", "aider",
 }
 CLIS = sorted(NETWORK_CLIS | LOCAL_CLIS)
 CLI_WORDS = {c: re.compile(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])") for c in CLIS}
@@ -127,13 +223,19 @@ NET_IMPORT_RE = re.compile(
     r"^\s*(?:import|from)\s+(requests|httpx|aiohttp|urllib|urllib3|http\.client|"
     r"socket|boto3|botocore|tweepy|websockets|paramiko|ftplib|smtplib|yfinance|"
     r"web3|openai|anthropic|google\.generativeai)\b", re.M)
-INSTALL_RE = re.compile(
-    r"^\s*(?:sudo\s+)?(?:pip3?\s+install|python3?\s+-m\s+pip\s+install|npm\s+(?:i|install)|"
+_INSTALL_CMD = (
+    r"(?:pip3?\s+install|python3?\s+-m\s+pip\s+install|npm\s+(?:i|install)|"
     r"pnpm\s+add|yarn\s+add|uv\s+(?:pip\s+)?(?:install|add|sync)|git\s+clone|"
     r"apt(?:-get)?\s+install|brew\s+install|go\s+install|cargo\s+install|"
-    r"docker\s+(?:pull|run)|gh\s+repo\s+clone|npx\s+|curl[^\n|]*\|\s*(?:ba)?sh|"
-    r"wget[^\n]*\|\s*(?:ba)?sh|conda\s+install|gem\s+install)\b",
-    re.I)
+    r"docker\s+(?:pull|run)|gh\s+repo\s+clone|npx\s+|uvx\s+|pipx\s+install|"
+    r"curl[^\n|]*\|\s*(?:ba)?sh|wget[^\n]*\|\s*(?:ba)?sh|conda\s+install|"
+    r"gem\s+install|rustup\s+)"
+)
+# An install command at the start of a line (optionally after a shell prompt).
+INSTALL_RE = re.compile(r"^\s*(?:[$>]\s*)?(?:sudo\s+)?" + _INSTALL_CMD + r"\b", re.I)
+# The same command anywhere, used together with an inline code span so that
+# `npm install -g x` written inside prose still counts as install-time.
+INSTALL_INLINE_RE = re.compile(_INSTALL_CMD + r"\b", re.I)
 # constructs that mean "this line is code/command", not prose
 CODEY_RE = re.compile(
     r"(?:requests|httpx)\.(?:get|post|put|delete)|urlopen\s*\(|fetch\s*\(|"
@@ -157,11 +259,25 @@ RAW_SOCKET_RE = re.compile(
     r"\bwhois\b|port\s+43\b|socket\.create_connection|socket\.socket\s*\(|"
     r"\btelnet\b|\bftplib\b|\braw\s+socket\b",
     re.I)
-LOCAL_APP_RE = re.compile(
-    r"Apple\s?(?:Notes|Reminders|Mail|Calendar)|iMessage|iCloud|Find\s?My|"
-    r"Keychain|Messages\.app|Notes\.app|osascript|1Password|Obsidian\s+Sync|"
-    r"AppleScript",
-    re.I)
+# local_apps is a fixed vocabulary, never a copied source line. Each entry
+# names the app plus where it syncs to. Matched only in code/command context.
+LOCAL_APP_MAP = [
+    (re.compile(r"iMessage|Messages\.app|application\s+[\"']?Messages|\bSMS\b", re.I),
+     "Messages", "iCloud/SMS"),
+    (re.compile(r"Apple\s?Notes|Notes\.app|application\s+[\"']?Notes", re.I),
+     "Notes", "iCloud"),
+    (re.compile(r"Apple\s?Reminders|Reminders\.app|application\s+[\"']?Reminders", re.I),
+     "Reminders", "iCloud"),
+    (re.compile(r"Apple\s?Calendar|Calendar\.app|application\s+[\"']?Calendar", re.I),
+     "Calendar", "iCloud"),
+    (re.compile(r"Apple\s?Mail|Mail\.app|application\s+[\"']?Mail", re.I), "Mail", None),
+    (re.compile(r"Find\s?My|application\s+[\"']?FindMy", re.I), "Find My", "iCloud"),
+    (re.compile(r"Keychain|security\s+find-generic-password", re.I), "Keychain", None),
+    (re.compile(r"1Password", re.I), "1Password", "1Password cloud"),
+    (re.compile(r"Obsidian\s+Sync", re.I), "Obsidian", "Obsidian Sync cloud"),
+    (re.compile(r"osascript|AppleScript", re.I), "AppleScript automation", None),
+    (re.compile(r"iCloud", re.I), "iCloud", "iCloud"),
+]
 PLATFORM_RE = {
     "macos": re.compile(r"macOS\b|Mac\b|OSX|/Applications/|darwin|\bHomebrew\b"),
     "linux": re.compile(r"\bLinux\b|/usr/bin|/etc/|\bapt-get\b|\bsystemd\b|\bs6-svc\b|Debian|Ubuntu"),
@@ -263,6 +379,31 @@ def iter_text_files(path, skipped):
                 skipped["unreadable"].append(f"{relname}: {exc.__class__.__name__}")
 
 
+def frontmatter_platforms(skill_dir):
+    """Fall back to the skill's own `platforms:` frontmatter when the scan
+    found no platform signal in the body."""
+    try:
+        with open(os.path.join(skill_dir, "SKILL.md"), encoding="utf-8",
+                  errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return []
+    m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
+    if not m:
+        return []
+    try:
+        fm = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError:
+        return []
+    plats = fm.get("platforms")
+    if isinstance(plats, str):
+        plats = [plats]
+    if not isinstance(plats, list):
+        return []
+    known = {"linux", "macos", "windows"}
+    return sorted({str(p).lower() for p in plats if str(p).lower() in known})
+
+
 def tool_context(line: str, name: str) -> bool:
     """A tool name counts only in a tool-call context, not in prose."""
     rx = TOOL_WORDS[name]
@@ -288,7 +429,8 @@ def scan_skill(repo: str, path: str, commit: str):
     runtime, setup, doc_hosts, artifact = {}, {}, set(), set()
     imports, clis, envs, setup_cmds = set(), set(), set(), []
     tool_ctx, tool_bare = set(), set()
-    network_cli_seen, network_cli_runtime, net_write, local_write = False, False, False, False
+    network_cli_seen, network_cli_runtime, unbounded_cli_runtime = False, False, False
+    net_write, local_write = False, False
     raw_socket, user_url = False, False
     local_apps, platforms = [], set()
     cred_files = set()
@@ -306,7 +448,8 @@ def scan_skill(repo: str, path: str, commit: str):
                 in_fence = not in_fence
                 continue
             stripped = line.strip()
-            is_install = bool(INSTALL_RE.match(line))
+            is_install = bool(INSTALL_RE.match(line)) or bool(
+                INLINE_CODE_RE.search(line) and INSTALL_INLINE_RE.search(line))
             is_cmd = bool(CLI_START.match(line)) or is_install or \
                 bool(re.match(r"^\s*[$>]\s*\S", line))
             code_context = (is_code or in_fence or is_cmd or is_install
@@ -344,6 +487,8 @@ def scan_skill(repo: str, path: str, commit: str):
                             network_cli_seen = True
                             if not is_install:
                                 network_cli_runtime = True
+                                if name in UNBOUNDED_CLIS:
+                                    unbounded_cli_runtime = True
                 if NET_WRITE_RE.search(line):
                     net_write = True
                     network_cli_seen = True
@@ -363,12 +508,14 @@ def scan_skill(repo: str, path: str, commit: str):
             for m in CRED_FILE_RE.finditer(line):
                 cred_files.add(m.group(0))
             # --- signals -----------------------------------------------------
-            if RAW_SOCKET_RE.search(line):
-                raw_socket = True
+            if code_context:
+                if RAW_SOCKET_RE.search(line):
+                    raw_socket = True
+                for rx, app, syncs in LOCAL_APP_MAP:
+                    if rx.search(line):
+                        local_apps.append((app, syncs))
             if USER_URL_RE.search(line):
                 user_url = True
-            if LOCAL_APP_RE.search(line):
-                local_apps.append(redact(stripped)[:120])
             for plat, rx in PLATFORM_RE.items():
                 if rx.search(line):
                     platforms.add(plat)
@@ -387,28 +534,33 @@ def scan_skill(repo: str, path: str, commit: str):
     net_import = bool(NET_IMPORT_RE.search(all_text))
     reach = {}
     for t in sorted(tools):
-        if t in WIDE_TOOLS:
-            reach[t] = "wide"
-        elif t == "delegate_task":
-            # the child inherits tools, but the skill's rule constrains it to narrow
-            reach[t] = "narrow"
-        elif t in MEDIUM_TOOLS:
-            reach[t] = "medium"
+        if t == "delegate_task":
+            # Nothing at Stage 1 constrains the child's toolset, so the parent
+            # is as wide as whatever the child is handed. `inherits` ranks as
+            # medium for shape; `delegation.rule` records what later stages
+            # must enforce, not what the scan observed.
+            reach[t] = "inherits"
         elif t == "terminal":
-            reach[t] = "wide" if ((runtime_hosts and network_cli_seen) or user_url) else (
-                "medium" if network_cli_seen else "narrow")
+            reach[t] = "wide" if (unbounded_cli_runtime or user_url) \
+                else ("medium" if network_cli_runtime else "narrow")
         elif t == "execute_code":
-            reach[t] = "wide" if (runtime_hosts or net_import) else "narrow"
+            reach[t] = "wide" if (net_import or network_cli_runtime or user_url) \
+                else "narrow"
         else:
-            reach[t] = "narrow"
+            reach[t] = classify_reach(t)
 
     wide_reach = sorted(t for t, r in reach.items() if r == "wide")
-    RANK = {"narrow": 0, "medium": 1, "wide": 2}
+    # `inherits` ranks with medium: the floor until a later stage pins the
+    # child's toolset.
+    RANK = {"narrow": 0, "medium": 1, "inherits": 1, "unknown": 1, "wide": 2}
     tool_max = max((reach[t] for t in tools), key=lambda r: RANK[r], default="narrow")
-    # shape = widest of the skill's own code and its tools' reach
-    wide = bool(wide_reach) or raw_socket or (user_url and bool(runtime_hosts)) \
+    # shape = widest of the skill's own code and its tools' reach.
+    # raw_sockets stays a flag that requires socket-level enforcement (it
+    # bypasses proxy settings) but is not open-world egress, so it does not
+    # force wide.
+    wide = bool(wide_reach) or (user_url and bool(runtime_hosts)) \
         or len(runtime_hosts) > 8
-    medium = (not wide) and (tool_max == "medium" or network_cli_runtime or bool(
+    medium = (not wide) and (RANK[tool_max] >= 1 or network_cli_runtime or bool(
         runtime_hosts or cred_envs or cred_files or local_apps))
     shape = "wide" if wide else ("medium" if medium else "narrow")
 
@@ -428,6 +580,25 @@ def scan_skill(repo: str, path: str, commit: str):
     else:
         delegation = {"inherits": "none"}
 
+    # Actions: draft one entry per detected write so stage 2 confirms something
+    # instead of inventing it.
+    actions = []
+    if net_write:
+        actions.append({
+            "name": "external write",
+            "class": "write-shared",
+            "review_gate": "human",
+            "service": runtime_hosts[0] if runtime_hosts else "unknown",
+        })
+    elif local_write:
+        actions.append({"name": "local write", "class": "write-shared",
+                        "review_gate": "autorun"})
+
+    local_apps_dedup = {}
+    for app_name, syncs in local_apps:
+        local_apps_dedup[app_name] = syncs
+    platforms_final = sorted(platforms) or frontmatter_platforms(src) or ["unknown"]
+
     reasoning = (
         f"Deterministic static scan of {n_files} file(s): {len(runtime_hosts)} runtime host(s), "
         f"{len(setup_only)} setup-only host(s), {len(doc_only)} documentation host(s), "
@@ -444,9 +615,9 @@ def scan_skill(repo: str, path: str, commit: str):
         "path": path,
         "commit": commit,
         "shape": shape,
-        "ceiling": shape,
+        "ceiling": None,
         "summary": "Deterministic static baseline; review and dynamic stages pending",
-        "actions": [],
+        "actions": actions,
         "tools": [{"name": t, "reach": reach[t]} for t in sorted(tools)],
         "binaries": [{"program": c, "scope": "unknown"} for c in sorted(clis)],
         "resources": {
@@ -457,7 +628,7 @@ def scan_skill(repo: str, path: str, commit: str):
                 "artifact_refs": [{"host": h, "why": "referenced by generated output"}
                                   for h in artifact_only],
                 "tool_mediated": sorted(
-                    (MEDIUM_TOOLS | WIDE_TOOLS | {"delegate_task"}) & tools),
+                    t for t in tools if reach[t] in ("medium", "wide", "inherits")),
                 "raw_sockets": raw_socket,
             },
             "disk": {
@@ -474,9 +645,10 @@ def scan_skill(repo: str, path: str, commit: str):
                 "gpu": "unknown",
                 "cpu_ram": "unknown",
                 "devices": [],
-                "platforms": sorted(platforms) or ["unknown"],
+                "platforms": platforms_final,
             },
-            "local_apps": [{"name": a} for a in sorted(set(local_apps))],
+            "local_apps": [({"name": n, "syncs_to": s} if s else {"name": n})
+                           for n, s in local_apps_dedup.items()],
             "credentials": cred_envs + sorted(cred_files),
             "out_of_band": [],
         },
@@ -518,17 +690,22 @@ def scan_skill(repo: str, path: str, commit: str):
         "env_vars": sorted(envs),
         "credential_names": cred_envs + sorted(cred_files),
         "hermes_tools": {"context": sorted(tool_ctx), "bare": sorted(tool_bare)},
+        "tool_vocabulary": {"source": TOOL_VOCAB_SOURCE, "names": len(ALL_TOOLS)},
         "tool_reach": reach,
         "setup_commands": sorted(set(setup_cmds)),
         "signals": {
             "raw_sockets": raw_socket,
             "user_supplied_url": user_url,
             "network_cli": network_cli_seen,
+            "network_cli_runtime": network_cli_runtime,
+            "unbounded_cli_runtime": unbounded_cli_runtime,
             "network_import": net_import,
             "network_write": net_write,
             "local_write": local_write,
-            "local_apps": sorted(set(local_apps)),
+            "local_apps": [{"name": n, "syncs_to": s} if s else {"name": n}
+                           for n, s in local_apps_dedup.items()],
             "platforms": sorted(platforms),
+            "platforms_from_frontmatter": not platforms and platforms_final != ["unknown"],
         },
         "shape_reasoning": reasoning,
     }
@@ -552,6 +729,8 @@ def main(argv=None):
         print(f"error: {repo} has no skills/ or optional-skills/ - pass --repo", file=sys.stderr)
         return 2
     commit = git_commit(repo)
+    load_tool_vocabulary(repo)
+    print(f"tool vocabulary: {TOOL_VOCAB_SOURCE} ({len(ALL_TOOLS)} names)", flush=True)
     paths = enumerate_skills(repo)
     if args.only:
         want = {p.strip() for p in args.only.split(",")}
