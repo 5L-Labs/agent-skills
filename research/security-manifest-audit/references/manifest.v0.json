@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes-security-manifest/v0",
+  "title": "Hermes Agent skill security manifest v0",
+  "type": "object",
+  "required": ["schema", "skill", "path", "commit", "shape", "ceiling", "summary",
+               "actions", "tools", "binaries", "resources", "side_effects",
+               "delegation", "escalations", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "hermes-security-manifest/v0"},
+    "skill": {"type": "string", "minLength": 1},
+    "path": {"type": "string", "pattern": "^(skills|optional-skills)/"},
+    "commit": {"type": "string", "pattern": "^([0-9a-f]{40}|unknown)$"},
+    "shape": {"enum": ["narrow", "medium", "wide"]},
+    "ceiling": {
+      "enum": ["narrow", "medium", "wide"],
+      "description": "widest shape this skill may ever be granted; read by the OpenShell policy prover"
+    },
+    "summary": {"type": "string", "minLength": 1},
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "class", "review_gate"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "class": {"enum": ["read", "draft", "write-shared", "irreversible"]},
+          "review_gate": {"enum": ["autorun", "human"]},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "reach"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "reach": {"enum": ["narrow", "medium", "wide"]},
+          "provider": {"type": "string"},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "binaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["program", "scope"],
+        "additionalProperties": false,
+        "properties": {
+          "program": {"type": "string"},
+          "scope": {
+            "enum": ["workspace", "home", "system", "user-specified", "network", "unknown"],
+            "description": "OpenShell/nono scope rule for this program; unknown until a later stage observes it"
+          },
+          "why": {"type": "string"}
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "required": ["network", "disk"],
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "object",
+          "required": ["runtime", "setup", "artifact_refs", "tool_mediated", "raw_sockets"],
+          "additionalProperties": false,
+          "properties": {
+            "runtime": {"$ref": "#/$defs/hostList"},
+            "setup": {"$ref": "#/$defs/hostList"},
+            "artifact_refs": {"$ref": "#/$defs/hostList"},
+            "tool_mediated": {"type": "array", "items": {"type": "string"}},
+            "raw_sockets": {"type": "boolean"}
+          }
+        },
+        "disk": {
+          "type": "object",
+          "required": ["read", "write", "est_bytes"],
+          "additionalProperties": false,
+          "properties": {
+            "read": {"type": "array", "items": {"$ref": "#/$defs/diskScope"}},
+            "write": {"type": "array", "items": {"$ref": "#/$defs/diskScope"}},
+            "est_bytes": {"enum": ["small", "medium", "large", "unknown"]}
+          }
+        },
+        "hardware": {
+          "type": "object",
+          "required": ["gpu", "cpu_ram", "devices", "platforms"],
+          "additionalProperties": false,
+          "properties": {
+            "gpu": {"enum": ["none", "optional", "required", "unknown"]},
+            "vram_mb": {"type": ["integer", "null"]},
+            "cpu_ram": {"enum": ["low", "medium", "high", "unknown"]},
+            "devices": {"type": "array", "items": {"type": "string"}},
+            "platforms": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "local_apps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string"},
+              "downstream": {"type": "string"}
+            }
+          }
+        },
+        "credentials": {"type": "array", "items": {"type": "string"}},
+        "out_of_band": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "side_effects": {"enum": ["none", "local-write", "external-read", "external-write", "unknown"]},
+    "delegation": {
+      "type": "object",
+      "required": ["inherits"],
+      "additionalProperties": false,
+      "properties": {
+        "inherits": {"enum": ["none", "inherits-toolsets"]},
+        "rule": {
+          "enum": ["narrow-only", "inherit"],
+          "description": "narrow-only: delegated children get no wider grant than the parent's own shape"
+        }
+      }
+    },
+    "escalations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["to", "when", "grant"],
+        "additionalProperties": false,
+        "properties": {
+          "to": {"enum": ["narrow", "medium", "wide"]},
+          "when": {"type": "string"},
+          "grant": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["method", "confidence", "evidence", "inputs"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {"enum": ["static", "+review", "+dynamic", "+eval-backtest"]},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "array", "items": {"type": "string"}},
+        "inputs": {
+          "type": "object",
+          "description": "everything the confidence score is recomputed from",
+          "additionalProperties": true,
+          "properties": {
+            "files_scanned": {"type": "integer"},
+            "files_skipped": {"type": "integer"},
+            "hosts_runtime": {"type": "integer"},
+            "hosts_setup": {"type": "integer"},
+            "tools": {"type": "integer"},
+            "review": {"type": ["object", "null"]},
+            "dynamic": {"type": ["object", "null"]},
+            "backtest": {"type": ["object", "null"]}
+          }
+        }
+      }
+    },
+    "status": {"enum": ["ok", "blocked-on-env", "unknown"]},
+    "unblock_requires": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "hostList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["host"],
+        "additionalProperties": false,
+        "properties": {
+          "host": {"type": "string"},
+          "ports": {"type": "array", "items": {"type": "integer"}},
+          "methods": {"type": "array", "items": {"type": "string"}},
+          "why": {"type": "string"}
+        }
+      }
+    },
+    "diskScope": {"enum": ["workspace", "home", "system", "user-specified"]}
+  }
+}

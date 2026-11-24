@@ -1,7 +1,7 @@
 ---
 name: security-manifest-audit
 description: "Use when auditing skills into security manifests."
-version: 1.0.0
+version: 2.0.0
 author: Hermes Agent 01
 license: MIT
 metadata:
@@ -11,40 +11,80 @@ metadata:
 
 # Security Manifest Audit
 
-Builds a per-skill `manifest.yaml` + `evidence/static.json` corpus for a skill catalog. No skill code is executed and no network calls are made by the auditors.
+Builds a per-skill `manifest.yaml` + `evidence/static.json` corpus for a skill
+catalog, where every grant is backed by evidence a later stage can check.
 
-## When to Use
+**This skill implements Stage 1 only: the static census.** No skill code is
+executed and no network calls are made. It reads text and produces drafts at
+`provenance.method: static`, `confidence <= 0.5`.
 
-Use when a skill catalog needs a security/egress census: manifest generation, tool-reach classification, credential/host discovery, or a repeatable audit of many skills at once.
+## Stages
+
+| stage | what it earns | method | confidence cap | status |
+|---|---|---|---|---|
+| 1 static census | which files exist and what they reference | `static` | 0.5 | **implemented here** |
+| 2 review | a reviewer verifies shape, hosts and tools against every file | `+review` | 0.6 | TODO |
+| 3 deny-all dynamic run | the skill runs in a jail with DNS/CONNECT/SNI sinkholes | `+dynamic` | 0.75 | TODO |
+| 4 eval generation + backtest | generated evals pass under narrow/manifest/open jails | `+eval-backtest` | 1.0 | TODO |
+| 5 narrowing + export | drop unused grants, add observed hosts, emit OpenShell/nono policies | inherits | - | TODO |
+
+Stage 1 manifests are inputs to stages 2-5, not a finished grant. A manifest at
+`method: static` is never production-ready: 0.5 sits below the 0.7 prod floor in
+the environment profiles by construction.
 
 ## Architecture: deterministic first
 
-1. Enumerate skills into 15-skill batch files. Keep briefing, batches, retries, generator and reports in the audited repo under `security-manifests/_run/` so restarts survive scratch pruning.
-2. Run `scripts/generate_baseline.py` with `/usr/bin/python3` (needs PyYAML). It scans every text file and emits evidence JSON plus draft manifests. Baseline shapes over-call `wide` — they are drafts, not truth.
-3. LLM review in five-skill micro-batches. Each child reads the full skill source, patches files in place, and checkpoints after EACH skill. Never rewrite a verified skill.
-4. Final deterministic validation and a resource/tool distribution report.
+1. Run `scripts/generate_baseline.py --repo <audited-repo>`. It enumerates every
+   `SKILL.md` under `skills/` and `optional-skills/`, scans the text, and writes
+   `<out>/<skill>/manifest.yaml` + `<out>/<skill>/evidence/static.json`. Pass
+   `--schema references/manifest.v0.json` to drop the schema into `<out>/_schema/`.
+   Deterministic output is a **draft**, not truth.
+2. Later stages patch those files in place, one skill at a time, and raise
+   `provenance.method` — never the number alone.
+3. Validate with `scripts/validate_corpus.py`. It gates on the stage, not the
+   score, and regenerates the distribution report.
 
-## Dispatch rules (learned the hard way)
+## What Stage 1 decides deterministically
 
-- Pin the child model in config with `hermes config set delegation.model <model>` and `delegation.provider`. Per-task `model`/`provider` fields passed to `delegate_task` are ignored when config pins one.
-- Keep `delegation.max_concurrent_children` at 3 and send at most 3 tasks per call. The tool rejects larger calls, and a 10-way fan-out hit Nous Portal 429 fair-share.
-- A free model at 3-way concurrency is the safe default. Paid models can die mid-run with 402 out-of-credits. Per-skill checkpointing makes this survivable.
-- In delegated sessions `execute_code` approval prompts block. Put "use `patch`/`write_file`, never `execute_code`" in the briefing.
-- Batch files must carry absolute paths; a relative "read shared_context.md" resolved to the wrong directory in one child.
-- A content-policy refusal can arrive AFTER all files were checkpointed. Verify on disk before re-dispatching.
+- A URL is a runtime candidate only in code, a command or a script. Prose and
+  markdown links are documentation. Install-time commands go to `setup` only.
+- Tool names count only in tool-call contexts. `file`, `memory`, `skills` and
+  `web` are not tools.
+- `local_apps` is filled from the Apple/iMessage/iCloud regex, not inferred.
+- Ports, methods, `est_bytes`, `gpu` and `cpu_ram` are `unknown` unless observed.
+- Shape = widest of the skill's own code reach and its tools' reach. Delegation
+  is `narrow-only`, so a delegated child cannot widen the parent.
 
-## Manifest invariants
+## Manifest format
 
-- Schema `hermes-security-manifest/v0`, audited commit, `shape: narrow|medium|wide`, top-level `side_effects` and `delegation` (not nested under `resources`), `provenance.confidence >= 0.7`.
-- Shape: narrow = no runtime network or credentials; medium = fixed hosts or scoped credentials; wide = open-world egress or inherited wide delegation. Tool reach uses the same scale; skill shape = widest of code and tools unless the wide part is a declared escalation.
-- Credentials: names only. Keep runtime hosts, install-time setup hosts and viewer-side artifact hosts separate. Generic prose tool mentions (`file`, `memory`, `skills`, `web`) are false positives.
+Schema: `references/manifest.v0.json`. Required top-level keys: `schema`, `skill`,
+`path`, `commit`, `shape`, `ceiling`, `summary`, `actions`, `tools`, `binaries`,
+`resources`, `side_effects`, `delegation`, `escalations`, `provenance`.
+
+- `actions[]` — `class` (read/draft/write-shared/irreversible) and `review_gate`
+  (autorun/human).
+- `binaries[]` — one entry per program with its OpenShell/nono `scope`.
+- `ceiling` — widest shape this skill may ever be granted (OpenShell prover).
+- `delegation.rule: narrow-only`.
+- `provenance.inputs` — everything the confidence score is recomputed from:
+  `files_scanned`, `files_skipped`, `hosts_runtime`, `hosts_setup`, `tools`,
+  `review`, `dynamic`, `backtest`.
 
 ## Validation (MUST pass before calling a corpus done)
 
-- [ ] Every skill in the batch lists has both files.
-- [ ] All YAML parse and contain every required field.
-- [ ] Zero deterministic-baseline notes remain; confidence >= 0.7 everywhere.
-- [ ] No secret-like patterns in manifests.
-- [ ] Resource/tool distribution report generated.
+Run
 
-See `references/playbook.md` for the model-failure matrix, exact validation commands and the report generator.
+```bash
+/usr/bin/python3 scripts/validate_corpus.py --corpus <out> --repo <audited-repo> \
+  --report <out>/_reports/distribution.md
+```
+
+It MUST report `result: pass`: every skill covered; YAML/JSON parse; schema
+valid; `confidence <= cap(method)`; `provenance.inputs` present; no anchored
+secret patterns; no prose words in `tools`; runtime/setup/artifact host sets
+disjoint; no duplicated hosts.
+
+`references/playbook.md` has exact commands and the review briefing.
+`references/validation-spec.md` has the MUST/MUST NOT checks.
+`references/run-2026-11.md` has the 185-skill run log (model-failure matrix and
+dispatch rules — environment-specific, not skill rules).

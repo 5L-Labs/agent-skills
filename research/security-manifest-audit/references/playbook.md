@@ -1,42 +1,61 @@
 # Security Manifest Audit — playbook
 
-## Model-failure matrix (observed 2026-11, 185-skill audit)
-
-| Setup | Result | Lesson |
-|---|---|---|
-| qwen3.8-27b local, 10 tasks | context overflow / gateway interruption, 0 files | small models cannot hold a full review batch |
-| qwen/qwen4-max:free, 10-way fan-out | Nous Portal 429 fair-share, 0 files | free tier still has account-level concurrency limits |
-| moonshotai/kimi-k3.1-pro, 3-way | 54 skills verified, then 402 out of credits | paid model works until billing stops; checkpoints saved the work |
-| tencent/hy4-flash:free, 3-way | all remaining work completed | safe default in this environment |
-
-Raw HTTP calls to auth.json tokens failed 401; kilocode key 401 INVALID_TOKEN; openrouter 402 no credits. The gateway CLI path (`hermes chat -m ...`) worked when raw API calls did not. Always smoke-test with `hermes chat -q 'Reply OK' -Q -m <model> --max-turns 1` before a large fan-out.
+Operational detail for Stage 1 (static census). Dispatch and model notes live in
+`run-2026-11.md`.
 
 ## Exact commands
 
 ```bash
-# Pin child model and concurrency
-hermes config set delegation.model tencent/hy4-flash:free
-hermes config set delegation.provider nous
-hermes config set delegation.max_concurrent_children 3
-hermes config set delegation.child_timeout_seconds 1800
+# 1. deterministic baseline. PyYAML is on /usr/bin/python3, not the venv python.
+/usr/bin/python3 scripts/generate_baseline.py \
+    --repo   /path/to/audited-repo \
+    --out    /path/to/audited-repo/security-manifests \
+    --schema references/manifest.v0.json
 
-# Deterministic baseline
-/usr/bin/python3 /path/to/security-manifests/_run/generate_baseline.py
+# 2. validate + distribution report. Exit code 0 only when every check passes.
+/usr/bin/python3 scripts/validate_corpus.py \
+    --corpus   /path/to/audited-repo/security-manifests \
+    --repo     /path/to/audited-repo \
+    --json-out /tmp/validation.json \
+    --report   /path/to/audited-repo/security-manifests/_reports/distribution.md
 ```
 
-Validation keys: `schema`, `skill`, `path`, `commit`, `shape`, `summary`, `tools`, `resources`, `side_effects`, `delegation`, `escalations`, `provenance`. Evidence keys: `hosts_found`, `imports`, `clis`, `env_vars`, `hermes_tools`, `setup_commands`, `shape_reasoning`. Check confidence >= 0.7, zero baseline notes, artifact coverage against batch lists, and secret-like regexes. Use `/usr/bin/python3` (PyYAML installed there).
+`--repo` also accepts `HERMES_AUDIT_REPO`; `--out` accepts `HERMES_AUDIT_OUT`.
+The commit is read with `git rev-parse HEAD` from `--repo`, never hardcoded.
 
-## Review briefing essentials
+## Validation keys
+
+Manifest: `schema`, `skill`, `path`, `commit`, `shape`, `ceiling`, `summary`,
+`actions`, `tools`, `binaries`, `resources`, `side_effects`, `delegation`,
+`escalations`, `provenance`.
+
+`evidence/static.json`: `files_scanned`, `skipped`, `hosts_found`, `setup_hosts`,
+`doc_hosts`, `artifact_hosts`, `imports`, `clis`, `env_vars`, `credential_names`,
+`hermes_tools`, `tool_reach`, `setup_commands`, `signals`, `shape_reasoning`.
+
+## Stage-confidence gate
+
+`static` <= 0.5, `+review` <= 0.6, `+dynamic` <= 0.75, `+eval-backtest` <= 1.0.
+`validate_corpus.py` checks the declared stage against the cap, not the number.
+A reviewer that raises `confidence` without changing `method` and `inputs` fails
+validation. `provenance.inputs` is what makes the score recomputable.
+
+## Review briefing essentials (stage 2)
 
 - Absolute paths for shared context, batch file, repo root and audited commit.
-- "Baseline files already exist; verify and patch in place. Do not rewrite from scratch."
+- "Baseline files already exist; verify and patch in place. Do not rewrite."
 - Per-skill checkpoint: finish both files before starting the next skill.
-- Resume rule: skip skills whose provenance has confidence >= 0.7 and no baseline note.
-- Never print credential values; names only. No network, no installs, no skill-code execution.
+- Resume rule: skip skills whose `provenance.method` is already `+review` or later.
+- Never print credential values; names only. No network, no installs, no code execution.
+- Use `patch`/`write_file`, never `execute_code` — approvals block in delegated sessions.
 
 ## Pitfalls
 
-- Reviewers sometimes nest `side_effects` under `resources`; final validation must check top-level presence and fix in place.
-- Tool names in prose over-call shape. Fix `tools` and `tool_mediated` before trusting `shape`.
-- A child may use `execute_code` despite the briefing; steer it mid-run to `patch`/`write_file`.
-- Results reported by children are self-reports. Always verify on disk before declaring done.
+- A colon followed by `43` is not a raw socket. Look for `whois`,
+  `socket.create_connection`, `socket.socket(...)` plus `connect`, or `ftplib`.
+- An inline code span is not code context. A markdown link on a line that also
+  has a backticked filename elsewhere is documentation, not a runtime host.
+- Files over 400 KB and `node_modules` are skipped and recorded under `skipped`.
+  Read that list before declaring a skill clean.
+- `import numpy as np` records `numpy`. Aliases are not module names.
+- Stage-1 output is a draft. Never raise `confidence` to "fix" a shape.
