@@ -24,9 +24,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     ph = sub.add_parser(
         "headlines",
         help=(
-            "Headlines. Default transport is the public WSJ homepage (no auth). "
-            "Use --via=graphql for named collections or --via=html for the "
-            "cookie-bound print-edition scraper."
+            "Headlines. Default transport is the cookie-free homepage scrape, "
+            "which WSJ bot-walls (401) from datacenter IPs as of ~2026-10; "
+            "prefer --via=graphql (cookie, limit <=10; supports named "
+            "collections) or --via=html (print edition, cookie-bound)."
         ),
     )
     ph.add_argument(

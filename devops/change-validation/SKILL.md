@@ -33,17 +33,18 @@ After the change is complete and we've seen at least one good trial run, create 
 Add an entry to this skill's registry so we remember to check:
 
 1. Read `references/validation-registry.json` in THIS skill's directory
-2. Add a new entry: `{"skill": "<name>", "last_change": "<ISO date>", "spec": "references/validation-spec.md"}`
+2. Add or update the skill's entry: `{"skill": "<name>", "root": "<repository-relative skill directory>", "last_change": "<ISO date>", "spec": "references/validation-spec.md", "last_validated": null, "last_result": null}`
 3. Write it back
 
 ### Step 3: Validate at Next Run
 
 When the affected skill's cron job fires or the user runs it manually:
 
-1. Load the validation spec from the skill's `references/validation-spec.md`
+1. Load the validation spec at `<repository>/<root>/<spec>` from the registry entry
 2. Capture the actual output
 3. Compare against every MUST and MUST NOT in the spec
 4. Record pass/fail for each criterion
+5. Update that entry's `last_validated` to the ISO timestamp of this run and `last_result` to `"pass"` or `"fail"`. Repeat after each triage re-run; never mark an unexecuted check as passed.
 
 ### Step 4: Triage on Failure
 
@@ -88,12 +89,13 @@ If the spec was wrong (too strict, missed a valid variant), update it. The spec 
 
 ## Registry Format
 
-`references/validation-registry.json`:
+`root` is relative to the repository root; `spec` is relative to that skill directory. `references/validation-registry.json`:
 ```json
 {
   "skills": [
     {
       "skill": "car_tracker",
+      "root": "research/car_tracker",
       "last_change": "2026-07-27",
       "spec": "references/validation-spec.md",
       "last_validated": null,

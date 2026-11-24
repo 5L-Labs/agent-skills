@@ -24,7 +24,7 @@ This skill requires the following Python libraries:
 *   `requests`
 *   `python-dotenv`
 
-## How to Run
+## 1. Running the Pricing Benchmark Tool
 
 Execute the tool via Python:
 
@@ -39,15 +39,25 @@ python scripts/negotiator_tool.py --price <QUOTED_PRICE> [ --vin <VIN> ] [ --mak
 *   `--model`: (Optional) The vehicle model (e.g., Grand Highlander, Pacifica, TX).
 *   `--trim`: (Optional) The trim level (e.g., Pinnacle AWD, Hybrid MAX Platinum AWD).
 
-## Example Output
+## 2. Running the Generic Lease & Finance Calculator
 
-The script outputs two tables formatted inside a markdown block that fit perfectly on mobile screens:
+Execute the generic financial engine for True $0 Drive-Off lease math, MSD optimization, and 100% OTD finance amortization:
 
-1.  **Quote vs. Benchmarks**: Compares the quoted OTD against the cheapest comparable unit found in the database, and against our baseline target vehicles (Pacifica, Grand Highlander, Lexus TX).
-2.  **Negotiation Bid Targets**: Outlines specific, actionable price bids:
-    *   **Midpoint (50% Spread)**: The halfway point between the dealer's quote and the cheapest market price.
-    *   **Cheapest Market (100%)**: The lowest price listed in the market for this exact trim.
-    *   **Aggressive (-10% Market)**: 10% below the cheapest market price, useful for low-balling or initiating a tough push.
+```bash
+python scripts/finance_engine.py --msrp <MSRP> [ --name <NAME> ] [ --mf <MF> ] [ --tax-rate <RATE> ] [ --doc-fee <FEE> ] [ --gov-fee <GOV> ] [ --acq-fee <ACQ> ] [ --res36 <RES36> ] [ --res48 <RES48> ] [ --json ]
+```
+
+### Parameters:
+*   `--msrp`: (Required) Vehicle MSRP sticker price.
+*   `--name`: (Optional) Vehicle description/label.
+*   `--mf`: (Optional) Base Tier 1 Money Factor (default `0.00220`).
+*   `--tax-rate`: (Optional) Sales tax rate (default `0.08875` for Yonkers NY).
+*   `--doc-fee`: (Optional) Document processing fee (default `$175.00` NY cap).
+*   `--gov-fee`: (Optional) Government registration/title/plates fee (default `$285.00` NY DMV).
+*   `--acq-fee`: (Optional) Captive lease acquisition fee (default `$650.00` TFS / `$795.00` LFS).
+*   `--res36`: (Optional) 36-month residual percentage (default `0.58`).
+*   `--res48`: (Optional) 48-month residual percentage (default `0.50`).
+*   `--json`: (Optional) Output raw JSON data object instead of Markdown table.
 
 ## Post-Sale Warranty (VSC) & Protection Contacts
 

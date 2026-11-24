@@ -44,6 +44,8 @@ The tracker monitors target profiles specified in `config/target_profiles.json`.
 }
 ```
 
+`year`, when specified, requires a matching model year in both live and saved listings; unknown or invalid years are excluded. Omit it to monitor all years.
+
 ## How to Run
 
 Execute the tool via the project's virtualenv Python interpreter:

@@ -1,6 +1,6 @@
 # wsj-reader
 
-Programmatic Wall Street Journal access. Homepage headlines work without cookies; article bodies and URL-based audio resolution use the user's authenticated browser session. JSON output for agent consumption. 30-day article/audio cache.
+Programmatic Wall Street Journal access. Headlines come from the authenticated GraphQL gateway (`--via=graphql --limit ≤10`; the cookie-free homepage scrape has been 401 bot-walled since ~2026-10); article bodies and URL-based audio resolution use the user's authenticated browser session. JSON output for agent consumption. 30-day article/audio cache.
 
 > **Not affiliated with Dow Jones / The Wall Street Journal.** Uses the user's own session and follows polite rate-limiting (400ms spacing, backoff on 429/503). Respect WSJ's terms of service and your account's usage limits.
 
@@ -83,7 +83,7 @@ cookie/session status without updating `.env`.
 ## Use
 
 ```sh
-wsj headlines                                 # public WSJ homepage headlines, no cookie
+wsj headlines --via=graphql --limit 10          # recommended headlines path (cookie)
 wsj headlines --via=html --date 20260608       # specific print-edition date, requires cookie
 wsj headlines --via=html --section business --limit 5
 wsj headlines --via=graphql --collection most-popular --limit 5
