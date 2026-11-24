@@ -71,7 +71,8 @@ delivered to the Discord channel (the gateway chunks long responses).
 | Prep shim (real file in `HERMES_HOME/scripts/`) | `hn-brief-weekly-prep.py` | `hn-brief-monthly-prep.py` |
 | Corpus | last 7 published days, 20 headlines/day, 3000-char digest excerpt | last 30 published days, 12 headlines/day, 1500-char excerpt |
 | Skills | `unified-digest-themes`, `hn-brief-dataset` | same |
-| Model / provider | `qwen3.8-27b-instruct` / `ollama-qwen3.6:27b` (local, `http://host.containers.internal:11434/v1`) | same |
+| Model / provider | `qwen3.8-27b-instruct-mtp-d3-ctx131k-no-backend-sampling` / `ollama-qwen3.6:27b` (local, `http://host.containers.internal:11434/v1`) | same |
+| Toolsets | `["terminal"]` only | same |
 | Own-output cache | `/opt/data/cache/hn-brief/weekly/<YYYY-Www>.md` (path printed as `save_to:` in the corpus) | `/opt/data/cache/hn-brief/monthly/<YYYY-MM>.md` |
 | Wrapping | `wrap_response: false` — delivered raw, no cron header/footer | same |
 
@@ -83,8 +84,16 @@ Notes that cost time if forgotten:
 - The prompt is the contract. Cron agents follow the **prompt**, not the whole
   attached skill, so every mandatory step (format, citation rule, no Jargon
   section, `save_to` write) is restated in the prompt itself.
-- Pick the instruct model. `qwen3.8-27b` (no `-instruct`) is a thinking model —
-  it emits `reasoning_content` and returns nothing usable for a digest.
+- Pick the instruct model with an explicit large context. `qwen3.8-27b` (no
+  `-instruct`) is a thinking model — it emits `reasoning_content` and returns
+  nothing usable for a digest. And on this endpoint use the `ctx131k` variant:
+  Hermes resolves 131,072 tokens for the model from its catalog, but the local
+  server's own window is the binding limit, and the full agent request (skills +
+  ~23 K tokens of deferred tool schemas + an ~11 K-token corpus) exceeded it
+  while a bare 11 K-token call succeeded. Restricting `enabled_toolsets` to
+  `["terminal"]` plus the `ctx131k` variant fixes it.
+- Do not silently shrink the corpus to dodge a context error; measure first. A
+  44 KB corpus (~11 K tokens) round-trips fine as a direct call.
 - Jargon is **not** emitted by these jobs. Presentation is owned by the
   `jargon-notify` job; these digests are content only.
 
