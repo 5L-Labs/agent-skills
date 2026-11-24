@@ -20,8 +20,8 @@
       "root": "research/hn-brief-dataset",
       "last_change": "2026-11-24",
       "spec": "references/validation-spec.md",
-      "last_validated": null,
-      "last_result": null,
+      "last_validated": "2026-11-24T05:45:00+00:00",
+      "last_result": "partial-pass — weekly verified end-to-end (16 stories, 16 distinct Link + 16 distinct Discussion URLs, 0 fabricated, no Jargon section, 8537 chars, delivered to #hacker-news-weekly and cached to weekly/2026-W48.md). Daily + monthly still to confirm.",
       "note": "Daily now delivers email + Discord #hacker-news (separate state files per target); new weekly/monthly aggregator jobs use the local model. Validate: first daily run posts both targets exactly once; weekly (Sun 20:00 UTC) and monthly (1st 18:00 UTC) produce a real themed digest with citations, no Jargon section, and write their save_to cache file."
     }
   ]
