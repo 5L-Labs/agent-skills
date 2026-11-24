@@ -23,6 +23,7 @@
 - [ ] Weekly output ≤ 9000 chars, monthly ≤ 12000 chars
 - [ ] Weekly/monthly corpus header carries `save_to:` and the job writes its digest there (`/opt/data/cache/hn-brief/{weekly,monthly}/…`)
 - [ ] The corpus carries a per-story `article:` and `hn:` URL, and every `Link:`/`Discussion:` line in the digest is one of those, copied verbatim
+- [ ] Delivery confirmed by READING THE CHANNEL BACK — the message in the channel is the digest itself (a `last_status=ok` / `delivered` run can still have posted an error string)
 
 ## Negative Checks (MUST NOT be present)
 
@@ -33,6 +34,7 @@
 - [ ] No delivery when `quality.digestValid` is false
 - [ ] No duplicate delivery of a date to either target
 - [ ] No repeated `Link:`/`Discussion:` URL across different stories — each story carries its own article and HN URL
+- [ ] No tool-budget / `ran out of steps` / blocked-command text delivered in place of the digest
 - [ ] No `Jargon:` section in weekly/monthly output (presentation is owned by `jargon-notify`)
 - [ ] No seed/placeholder or thinking-model output (the aggregators must use the `-instruct` model, not `qwen3.8-27b`)
 - [ ] A weekly/monthly run must not invent content for a day the corpus marks MISSING

@@ -72,7 +72,7 @@ delivered to the Discord channel (the gateway chunks long responses).
 | Corpus | last 7 published days, 20 headlines/day, 3000-char digest excerpt, each story with its own `article:` + `hn:` URL | last 30 published days, 12 headlines/day, 1500-char excerpt, same URL contract |
 | Skills | `unified-digest-themes`, `hn-brief-dataset` | same |
 | Model / provider | `qwen3.8-27b-instruct-mtp-d3-ctx131k-no-backend-sampling` / `ollama-qwen3.6:27b` (local, `http://host.containers.internal:11434/v1`) | same |
-| Toolsets | `["terminal"]` only | same |
+| Toolsets | `["file"]` only (read_file/write_file — never terminal) | same |
 | Own-output cache | `/opt/data/cache/hn-brief/weekly/<YYYY-Www>.md` (path printed as `save_to:` in the corpus) | `/opt/data/cache/hn-brief/monthly/<YYYY-MM>.md` |
 | Wrapping | `wrap_response: false` — delivered raw, no cron header/footer | same |
 
@@ -81,6 +81,16 @@ Notes that cost time if forgotten:
 - The local model is slow by design; these are infrequent jobs and a run may
   take tens of minutes. Do not shorten the corpus to "speed it up" unless output
   quality is actually suffering.
+- **Never give a cron agent the terminal tool for writing output.** A scheduled
+  run has no user present, so approval-gated commands (heredocs, `python -c`)
+  come back `BLOCKED`. The model retries a blocked command instead of moving on,
+  burns the whole 60-tool-call budget, and delivers an *error message to the
+  channel* — status still reads `ok`/`delivered`, so only reading the output
+  catches it. Save with `write_file` (read first if it already exists), give the
+  job `enabled_toolsets: ["file"]`, and state in the prompt: never use the
+  terminal, never retry a failed tool call, return the digest regardless. A
+  17K-char monthly digest was produced and cached while the run still failed to
+  deliver — always verify the channel, not just `last_status`.
 - The prompt is the contract. Cron agents follow the **prompt**, not the whole
   attached skill, so every mandatory step (format, citation rule, no Jargon
   section, `save_to` write) is restated in the prompt itself.
