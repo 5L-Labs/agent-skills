@@ -242,6 +242,30 @@ gh api "repos/OWNER/REPO/pulls/NUMBER/comments" \
   -f side="RIGHT"
 ```
 
+Responding to a review — read every thread with its id, then reply in-thread:
+
+```bash
+# Every inline comment, with the id needed to reply
+gh api repos/OWNER/REPO/pulls/NUMBER/comments \
+  --jq '.[] | {id, user: .user.login, path, line, in_reply_to: .in_reply_to_id, body: (.body[0:200])}'
+
+# Reply INSIDE an existing thread (what review bots and reviewers expect)
+gh api "repos/OWNER/REPO/pulls/NUMBER/comments/COMMENT_ID/replies" \
+  --method POST -f body="Fixed in <sha>: <what changed>."
+```
+
+Pitfalls:
+
+- `gh pr view --comments` returns only issue-level comments and never inline review
+  comments. Always read threads from `pulls/NUMBER/comments`.
+- Review-bot comments (e.g. `cubic-dev-ai`) arrive as file-level comments with
+  `line: null` and `in_reply_to_id: null`. Reply with the `/replies` endpoint, not a
+  second top-level comment, or the thread will not be marked resolved.
+- Comment bodies contain backticks, quotes and tables. Write the JSON payload to a
+  file and pass `--input payload.json`; `-f body="..."` gets mangled by the shell.
+- Push the fix first and quote the new head SHA in each reply, so "Fixed in <sha>"
+  points at a commit the reviewer can actually open.
+
 ### 1.6 Merge PR
 
 ```bash
