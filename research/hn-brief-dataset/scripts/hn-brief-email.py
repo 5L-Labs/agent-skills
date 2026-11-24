@@ -1,31 +1,43 @@
 #!/usr/bin/env python3
-"""HN Brief daily email — sends the day's briefing over SMTP. Deterministic, no LLM.
+"""HN Brief daily delivery — the day's briefing to email AND the Daily Channel.
+
+Deterministic, no LLM. One entry point, two independent targets, each with its
+own already-sent record so a failure on one never suppresses the other.
 
 Data:  /opt/shared_space/hn-brief-data (latest.json -> daily/YYYY/MM/DD.json)
-Send:  SMTP, STARTTLS, credentials from the environment or the secret store.
-State: /opt/data/state/hn-brief-email.last-sent.json  (never sends a date twice)
+Email: SMTP STARTTLS, credentials from the secret store / environment.
+Slack: n/a
+Discord: bot token REST post to the Daily Channel (#hacker-news), chunked at
+         Discord's 2000-char message limit.
+State: /opt/data/state/hn-brief-email.last-sent.json
+       /opt/data/state/hn-brief-discord.last-sent.json
 Log:   /opt/data/logs/hn-brief-email.log
+
+Delivery is SILENT on success/skip (the cron job runs with deliver: local) — the
+script posts to Discord itself so nothing needs forwarding. A real transport
+failure prints a line and exits 2 so `hermes cron list` shows last_status=error.
 
 Exit without sending when:
   * latest.json's date is not today in America/New_York (the 07:45 run exits
     quietly and the 08:15 / 09:15 retries pick the briefing up), or
-  * quality.digestValid is false, or
-  * this date was already sent.
+  * quality.digestValid is false.
 
-Credentials, first hit wins:
-  1. process environment: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
-     (EMAIL_SMTP_HOST / EMAIL_ADDRESS / EMAIL_PASSWORD also accepted — that is
-     the naming Hermes' email platform template uses)
-  2. /opt/data/secrets/mail.env            (KEY=VALUE lines)
-  3. /opt/data/.env                        (master env for this container)
-  4. /opt/data/secrets/hermes.env
-Commented-out lines are ignored. SMTP_PASSWORD is only ever read into memory for
-smtplib.login() — it is never echoed, logged, cached, or written to any file.
+Email credentials, first hit wins:
+  1. /opt/data/secrets/mail.env            (KEY=VALUE lines)
+  2. /opt/data/.env                        (master env for this container)
+  3. /opt/data/secrets/hermes.env
+  4. process environment                   (fallback only)
+Names: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+(the EMAIL_SMTP_HOST / EMAIL_ADDRESS / EMAIL_PASSWORD naming Hermes' email
+platform template uses is also accepted). Commented-out lines are ignored.
+SMTP_PASSWORD is only ever read into memory for smtplib.login() — never echoed,
+logged, cached, or written to any file.
 
 Usage
 -----
-  hn-brief-email.py --dry-run          # render only, no send
-  hn-brief-email.py --force            # ignore the already-sent record
+  hn-brief-email.py --dry-run                      # render only, no send
+  hn-brief-email.py --targets discord              # Daily Channel only
+  hn-brief-email.py --targets email --force        # re-send the email
   hn-brief-email.py --to someone@x.com --dry-run
 """
 from __future__ import annotations
@@ -38,6 +50,9 @@ import re
 import smtplib
 import ssl
 import sys
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
@@ -48,6 +63,7 @@ DATA_ROOT = Path("/opt/shared_space/hn-brief-data")
 CACHE_DIR = Path("/opt/data/cache/hn-brief-email")
 LOG = Path("/opt/data/logs/hn-brief-email.log")
 STATE = Path("/opt/data/state/hn-brief-email.last-sent.json")
+DISCORD_STATE = Path("/opt/data/state/hn-brief-discord.last-sent.json")
 CRED_SOURCES = (
     Path("/opt/data/secrets/mail.env"),
     Path("/opt/data/.env"),
@@ -57,6 +73,10 @@ CRED_SOURCE_OF: dict[str, str] = {}  # key -> where its value came from (never t
 NY = ZoneInfo("America/New_York")
 DEFAULT_TO = "nick.lange@gmail.com"
 MAX_HEADLINES = 20
+# The Daily Channel — Discord #hacker-news on NJL's server.
+DEFAULT_DISCORD_CHANNEL = "1503214829509410887"
+DISCORD_API = "https://discord.com/api/v10"
+DISCORD_SAFE_LIMIT = 1900  # Discord hard-caps a message at 2000 chars
 # canonical key -> accepted names in priority order (SMTP_* first, then the
 # EMAIL_* naming Hermes' email platform template ships with)
 KEY_ALIASES: dict[str, tuple[str, ...]] = {
@@ -94,17 +114,12 @@ def parse_env_file(path: Path) -> dict[str, str]:
     return out
 
 
-def smtp_config() -> dict[str, str]:
-    """Resolve SMTP settings from the env/secret files, then the process env.
+def _resolved_env() -> dict[str, str]:
+    """Secrets from files first, process env last (files win — see below).
 
-    Accepts SMTP_* names and the EMAIL_* names Hermes' email-platform template
-    uses (see KEY_ALIASES).
-
-    **File first, process env last.** The files are what the operator edits; the
-    process environment is a snapshot taken when the gateway started, so a stale
-    value there (e.g. an old placeholder pasted before the real app password)
-    must not shadow the corrected file. Values are never logged; the source file
-    of each key is recorded in CRED_SOURCE_OF for diagnostics.
+    The process environment is a snapshot taken when the gateway started, so a
+    stale value there (e.g. an old placeholder pasted before the real app
+    password) must not shadow the corrected file. Values are never logged.
     """
     raw: dict[str, str] = {}
     for path in CRED_SOURCES:
@@ -116,6 +131,12 @@ def smtp_config() -> dict[str, str]:
         if val and key not in raw:
             raw[key] = val
             CRED_SOURCE_OF[key] = "process env"
+    return raw
+
+
+def smtp_config() -> dict[str, str]:
+    """Resolve SMTP settings from the env/secret files, then the process env."""
+    raw = _resolved_env()
     cfg: dict[str, str] = {}
     for canon, names in KEY_ALIASES.items():
         for name in names:
@@ -124,6 +145,11 @@ def smtp_config() -> dict[str, str]:
                 CRED_SOURCE_OF[canon] = CRED_SOURCE_OF.get(name, "?")
                 break
     return cfg
+
+
+def discord_token() -> str | None:
+    """Bot token for the Daily Channel; files win over the process env."""
+    return _resolved_env().get("DISCORD_BOT_TOKEN") or None
 
 
 # ── rendering ────────────────────────────────────────────────────────────────
@@ -186,7 +212,7 @@ def build_html(day: dict) -> str:
     )
 
 
-# ── transport ────────────────────────────────────────────────────────────────
+# ── transport: email ─────────────────────────────────────────────────────────
 
 def send_smtp(cfg: dict[str, str], to: str, subject: str, plain: str, html_body: str) -> str:
     host = cfg["SMTP_HOST"]
@@ -229,33 +255,106 @@ def send_smtp(cfg: dict[str, str], to: str, subject: str, plain: str, html_body:
     return f"{host}:{port} starttls as {sender}"
 
 
+# ── transport: Discord (the Daily Channel) ───────────────────────────────────
+
+def split_for_discord(text: str, limit: int = DISCORD_SAFE_LIMIT) -> list[str]:
+    """Split on line boundaries into chunks that fit Discord's 2000-char cap."""
+    parts: list[str] = []
+    cur = ""
+    for line in text.split("\n"):
+        while len(line) > limit:            # a single line longer than a message
+            if cur:
+                parts.append(cur.rstrip())
+                cur = ""
+            parts.append(line[:limit])
+            line = line[limit:]
+        if not cur:
+            cur = line
+        elif len(cur) + 1 + len(line) > limit:
+            parts.append(cur.rstrip())
+            cur = line
+        else:
+            cur += "\n" + line
+    if cur.strip():
+        parts.append(cur.rstrip())
+    return parts
+
+
+def _discord_post(token: str, channel: str, content: str) -> None:
+    req = urllib.request.Request(
+        f"{DISCORD_API}/channels/{channel}/messages",
+        data=json.dumps({"content": content}).encode("utf-8"),
+        headers={
+            "Authorization": f"Bot {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "hn-brief/1.0 (+hermes-agent)",
+        },
+        method="POST",
+    )
+    urllib.request.urlopen(req, timeout=30)
+
+
+def post_discord(token: str, channel: str, text: str) -> int:
+    """Post the briefing to the channel, chunked. Returns the number of messages."""
+    parts = split_for_discord(text)
+    n = len(parts)
+    for i, part in enumerate(parts, 1):
+        body = part if n == 1 else f"{part}\n({i}/{n})"
+        for attempt in range(5):
+            try:
+                _discord_post(token, channel, body)
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code == 429:  # rate limited — honour retry_after
+                    try:
+                        wait = float(json.loads(exc.read() or b"{}").get("retry_after", 2))
+                    except Exception:  # noqa: BLE001
+                        wait = 2.0
+                    time.sleep(min(max(wait, 1.0), 10.0))
+                    continue
+                detail = ""
+                try:
+                    detail = exc.read().decode("utf-8", "ignore")[:200]
+                except Exception:  # noqa: BLE001
+                    pass
+                raise RuntimeError(f"HTTP {exc.code} from Discord: {detail}") from exc
+        if n > 1:
+            time.sleep(1.0)  # stay under the per-channel bucket (~5 req / 5 s)
+    return n
+
+
 # ── state ────────────────────────────────────────────────────────────────────
 
-def last_sent_date() -> str | None:
-    if not STATE.exists():
+def _read_state(path: Path) -> str | None:
+    if not path.exists():
         return None
     try:
-        return json.loads(STATE.read_text(encoding="utf-8")).get("last_sent")
+        return json.loads(path.read_text(encoding="utf-8")).get("last_sent")
     except (json.JSONDecodeError, OSError):
         return None
 
 
-def record_sent(date: str, to: str) -> None:
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"last_sent": date, "sent_at": datetime.now(NY).isoformat(timespec="seconds"), "to": to}
-    tmp = STATE.with_suffix(".tmp")
+def _write_state(path: Path, date: str, dest: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"last_sent": date, "sent_at": datetime.now(NY).isoformat(timespec="seconds"), "to": dest}
+    tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    tmp.replace(STATE)
+    tmp.replace(path)
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="HN Brief daily email over SMTP")
+    ap = argparse.ArgumentParser(description="HN Brief daily delivery — email + the Daily Channel")
     ap.add_argument("--to", default=os.environ.get("HN_BRIEF_EMAIL_TO", DEFAULT_TO))
+    ap.add_argument("--targets", default=os.environ.get("HN_BRIEF_TARGETS", "email,discord"),
+                    help="comma list of targets: email, discord")
+    ap.add_argument("--channel", default=os.environ.get("HN_BRIEF_DISCORD_CHANNEL", DEFAULT_DISCORD_CHANNEL),
+                    help="Discord channel id for the Daily Channel")
     ap.add_argument("--dry-run", action="store_true", help="render only, never send")
     ap.add_argument("--force", action="store_true", help="send even if already sent today")
     args = ap.parse_args()
+    targets = {t.strip().lower() for t in args.targets.split(",") if t.strip()}
 
     if not DATA_ROOT.exists():
         log(f"dataset root {DATA_ROOT} not mounted")
@@ -272,9 +371,6 @@ def main() -> int:
     if not (day.get("quality") or {}).get("digestValid", False):
         log(f"skip: digestValid=false for {date}")
         return 0
-    if last_sent_date() == date and not args.force:
-        log(f"skip: {date} already sent")
-        return 0
 
     plain = build_plain(day)
     html_body = build_html(day)
@@ -283,27 +379,62 @@ def main() -> int:
     (CACHE_DIR / f"{date}.html").write_text(html_body, encoding="utf-8")
 
     if args.dry_run:
-        print(f"rendered {CACHE_DIR / (date + '.txt')} ({len(plain)} chars plain, {len(html_body)} chars html)")
+        print(f"rendered {CACHE_DIR / (date + '.txt')} "
+              f"({len(plain)} chars plain, {len(html_body)} chars html; "
+              f"{len(split_for_discord(plain))} Discord chunk(s)) "
+              f"targets={sorted(targets)}")
         return 0
 
-    cfg = smtp_config()
-    missing = [k for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD") if not cfg.get(k)]
-    if missing:
-        log(f"NOT SENT {date}: SMTP not configured (missing {', '.join(missing)}); "
-            f"expected SMTP_* (or EMAIL_*) in the process env or one of "
-            f"{', '.join(str(p) for p in CRED_SOURCES)}")
-        return 0
+    failures: list[str] = []
+    done: list[str] = []
 
-    try:
-        how = send_smtp(cfg, args.to, subject, plain, html_body)
-    except Exception as exc:  # noqa: BLE001 — credentials never appear in these messages
-        log(f"SEND FAILED {date} to {args.to}: {type(exc).__name__}: {exc}")
-        print(f"HN Brief email NOT sent ({date}): {type(exc).__name__}: {exc}")
-        return 2
-    record_sent(date, args.to)
-    log(f"sent {date} to {args.to} via {how} ({len(plain)} chars plain / {len(html_body)} chars html)")
-    print(f"HN Brief — {date} sent to {args.to} via {how}")
-    return 0
+    if "email" in targets:
+        if _read_state(STATE) == date and not args.force:
+            log(f"skip email: {date} already sent")
+        else:
+            cfg = smtp_config()
+            missing = [k for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD") if not cfg.get(k)]
+            if missing:
+                log(f"NOT SENT {date}: SMTP not configured (missing {', '.join(missing)}); "
+                    f"expected SMTP_* (or EMAIL_*) in the process env or one of "
+                    f"{', '.join(str(p) for p in CRED_SOURCES)}")
+            else:
+                try:
+                    how = send_smtp(cfg, args.to, subject, plain, html_body)
+                except Exception as exc:  # noqa: BLE001 — credentials never appear in these messages
+                    log(f"EMAIL SEND FAILED {date} to {args.to}: {type(exc).__name__}: {exc}")
+                    failures.append(f"email: {type(exc).__name__}: {exc}")
+                    print(f"HN Brief email NOT sent ({date}): {type(exc).__name__}: {exc}")
+                else:
+                    _write_state(STATE, date, args.to)
+                    log(f"email sent {date} to {args.to} via {how} ({len(plain)} chars plain / {len(html_body)} chars html)")
+                    done.append(f"email→{args.to}")
+
+    if "discord" in targets:
+        if _read_state(DISCORD_STATE) == date and not args.force:
+            log(f"skip discord: {date} already posted")
+        else:
+            token = discord_token()
+            if not token:
+                log(f"DISCORD POST FAILED {date}: DISCORD_BOT_TOKEN not found in "
+                    f"{', '.join(str(p) for p in CRED_SOURCES)} or the process env")
+                failures.append("discord: DISCORD_BOT_TOKEN missing")
+                print(f"HN Brief channel NOT posted ({date}): DISCORD_BOT_TOKEN missing")
+            else:
+                try:
+                    n = post_discord(token, args.channel, plain)
+                except Exception as exc:  # noqa: BLE001
+                    log(f"DISCORD POST FAILED {date} to channel {args.channel}: {type(exc).__name__}: {exc}")
+                    failures.append(f"discord: {type(exc).__name__}: {exc}")
+                    print(f"HN Brief channel NOT posted ({date}): {type(exc).__name__}: {exc}")
+                else:
+                    _write_state(DISCORD_STATE, date, f"discord:{args.channel}")
+                    log(f"discord posted {date} to channel {args.channel} ({n} message(s), {len(plain)} chars)")
+                    done.append(f"discord→{args.channel} ({n} msg)")
+
+    if done:
+        print(f"HN Brief — {date} delivered: " + ", ".join(done))
+    return 2 if failures else 0
 
 
 if __name__ == "__main__":

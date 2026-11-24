@@ -8,11 +8,21 @@
       "last_result": null
     },
     {
-      "skill": "hn-brief-dataset",
-      "last_change": "2026-11-22",
+      "skill": "waytoagi-reader",
+      "last_change": "2026-09-27",
       "spec": "references/validation-spec.md",
       "last_validated": null,
-      "last_result": null
+      "last_result": null,
+      "note": "Validate nightly rebuild survival + durable output dir on next daily (10:00) and weekly (16:00) delivery"
+    },
+    {
+      "skill": "hn-brief-dataset",
+      "root": "research/hn-brief-dataset",
+      "last_change": "2026-11-24",
+      "spec": "references/validation-spec.md",
+      "last_validated": null,
+      "last_result": null,
+      "note": "Daily now delivers email + Discord #hacker-news (separate state files per target); new weekly/monthly aggregator jobs use the local model. Validate: first daily run posts both targets exactly once; weekly (Sun 20:00 UTC) and monthly (1st 18:00 UTC) produce a real themed digest with citations, no Jargon section, and write their save_to cache file."
     }
   ]
 }
