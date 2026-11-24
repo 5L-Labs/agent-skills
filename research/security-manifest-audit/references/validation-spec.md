@@ -22,7 +22,10 @@
       only when the match is in code or command context.
 - [ ] Files and directories the scan skipped are recorded in `evidence.skipped`.
 - [ ] `evidence.tool_vocabulary.source` states where the tool names came from.
-- [ ] `scripts/test_generate_baseline.py` passes (14 fixture checks).
+- [ ] `scripts/test_generate_baseline.py` passes (16 fixture checks).
+- [ ] `evidence/static.json` carries no timestamp, so two runs over the same commit are
+      byte-identical.
+- [ ] `delegation.verified` is `false` at `method: static`.
 - [ ] A resource/tool distribution report is regenerated from the finished corpus.
 
 ## Negative Checks (MUST NOT be present)

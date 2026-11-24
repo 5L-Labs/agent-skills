@@ -10,6 +10,7 @@ below pins a bug that reached review at least once.
 Author: Hermes Agent 01
 """
 import importlib.util
+import json
 import os
 import pathlib
 import shutil
@@ -142,7 +143,8 @@ class GeneratorFixtureTest(unittest.TestCase):
         manifest, _ = self.scan("delegating-demo")
         self.assertEqual(self.reach(manifest, "delegate_task"), "inherits")
         self.assertEqual(manifest["delegation"],
-                         {"inherits": "inherits-toolsets", "rule": "narrow-only"})
+                         {"inherits": "inherits-toolsets", "rule": "narrow-only",
+                          "verified": False})
         self.assertIn(manifest["shape"], ("medium", "wide"))
 
     # --- 3. local_apps is a vocabulary, not a raw line -------------------
@@ -207,6 +209,17 @@ class GeneratorFixtureTest(unittest.TestCase):
             self.assertIn(action["class"],
                           ("read", "draft", "write-shared", "irreversible"))
             self.assertIn(action["review_gate"], ("autorun", "human"))
+
+    def test_evidence_is_byte_stable(self):
+        """Same commit, same corpus: no timestamps, so two runs agree."""
+        first = json.dumps(self.scan("wide-demo")[1], sort_keys=False)
+        second = json.dumps(self.scan("wide-demo")[1], sort_keys=False)
+        self.assertEqual(first, second)
+        self.assertNotIn("generated_at", json.loads(first))
+
+    def test_delegation_rule_is_unverified_at_static(self):
+        manifest, _ = self.scan("delegating-demo")
+        self.assertIs(manifest["delegation"]["verified"], False)
 
 
 if __name__ == "__main__":

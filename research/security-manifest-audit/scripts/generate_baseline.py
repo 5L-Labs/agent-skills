@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import datetime as _dt
 import glob
 import json
 import os
@@ -97,7 +96,11 @@ MEDIUM_HINTS = ("image", "video", "speech", "tts", "vision", "camera", "gadget",
 
 TOOL_VERB_RE = re.compile(
     r"\b(?:use|uses|using|via|through|call|calls|calling|invoke|invokes|invoking|"
-    r"run|runs|running)\s+(?:the\s+)?$", re.I)
+    r"run|runs|running)\b[^\w]{0,3}$", re.I)
+# A line that talks *about* a tool rather than invoking it.
+DOC_MENTION_RE = re.compile(
+    r"\b(?:renamed|deprecated|formerly|obsolete|no\s+longer|removed|instead\s+of|"
+    r"replaces?|replaced\s+by|not\s+a\s+tool|previous\s+name|alias\s+for)\b", re.I)
 
 # Filled by load_tool_vocabulary() before any scan runs.
 ALL_TOOLS: set[str] = set()
@@ -171,9 +174,9 @@ def load_tool_vocabulary(repo: str) -> bool:
 NETWORK_CLIS = {
     "curl", "wget", "gh", "ssh", "scp", "rsync", "aws", "gcloud", "az", "kubectl",
     "docker", "podman", "skopeo", "helm", "terraform", "xurl", "yt-dlp", "himalaya",
-    "gws", "openai", "nslookup", "dig", "ping", "whois", "npm", "npx", "uv", "go",
-    "cargo", "mail", "sendmail", "stripe", "rclone", "psql", "mysql", "redis-cli",
-    "mongosh", "claude", "codex", "gemini", "opencode", "aider",
+    "gws", "openai", "nslookup", "dig", "ping", "whois", "npm", "npx", "pnpm",
+    "yarn", "uv", "go", "cargo", "mail", "sendmail", "stripe", "rclone", "psql",
+    "mysql", "redis-cli", "mongosh", "claude", "codex", "gemini", "opencode", "aider",
 }
 LOCAL_CLIS = {
     "python", "python3", "pip", "pip3", "jq", "ffmpeg", "git", "bash", "sh", "zsh",
@@ -244,9 +247,11 @@ CODEY_RE = re.compile(
     re.I)
 NET_WRITE_RE = re.compile(
     r"\b(?:POST|PUT|PATCH|DELETE)\b|\bgit\s+push\b|\bgh\s+pr\s+create\b|\bscp\s+|"
-    r"\brsync\s+|requests\.post|httpx\.post|\bcurl\b[^\n|]*-X\s*(?:POST|PUT|PATCH|DELETE)|"
-    r"\b(?:upload|publish)\w*\b|\bsmtplib\b|\bsendmail\b|\bhermes\s+send\b",
-    re.I)
+    r"\brsync\s+|requests\.post|httpx\.post|"
+    r"\bcurl\b[^\n|]*(?:-X\s*(?:POST|PUT|PATCH|DELETE)|-d\s|--data|--data-raw|"
+    r"--data-binary|-F\s|--form|--upload-file|-T\s)|\bsmtplib\b|\bsendmail\b|"
+    r"\bhermes\s+send\b|\b(?:upload|publish)\w*\b",
+)
 LOCAL_WRITE_RE = re.compile(
     r"write_file|open\([^)]*[\"'][wa]|mkdir|>\s*/|\btee\s|shutil\.|\.dump\(|"
     r"write_text|os\.rename|\.write\(",
@@ -404,8 +409,13 @@ def frontmatter_platforms(skill_dir):
     return sorted({str(p).lower() for p in plats if str(p).lower() in known})
 
 
-def tool_context(line: str, name: str) -> bool:
-    """A tool name counts only in a tool-call context, not in prose."""
+def tool_context(line: str, name: str, in_fence: bool = False) -> bool:
+    """A tool name counts only in a tool-call context, not in prose.
+
+    A bare backticked name is not enough for a word that is also English
+    (`terminal`, `memory`): those need a fence or an invocation verb. A line
+    that talks *about* a tool (renamed, deprecated, instead of) never counts.
+    """
     rx = TOOL_WORDS[name]
     if re.search(r"(?:-\s*)?name\s*:\s*[\"']?" + re.escape(name) + r"[\"']?\b", line, re.I):
         return True
@@ -413,8 +423,15 @@ def tool_context(line: str, name: str) -> bool:
         return True
     if re.search(r"tools?\s*:\s*\[", line, re.I) and rx.search(line):
         return True
+    if DOC_MENTION_RE.search(line):
+        return False
+    if in_fence and rx.search(line):
+        return True
     for span in INLINE_CODE_RE.findall(line):
         if rx.search(span):
+            if name in AMBIGUOUS:
+                break
+            # an invocation usually carries arguments or is followed by one
             return True
     if name in AMBIGUOUS:
         m = rx.search(line)
@@ -498,7 +515,7 @@ def scan_skill(repo: str, path: str, commit: str):
             for name, rx in TOOL_WORDS.items():
                 if not rx.search(line):
                     continue
-                if tool_context(line, name):
+                if tool_context(line, name, in_fence):
                     tool_ctx.add(name)
                 elif name not in AMBIGUOUS and name not in NEVER_TOOLS:
                     tool_bare.add(name)
@@ -576,7 +593,11 @@ def scan_skill(repo: str, path: str, commit: str):
         side = "unknown"
 
     if "delegate_task" in tools:
-        delegation = {"inherits": "inherits-toolsets", "rule": "narrow-only"}
+        # `verified` is false at Stage 1: no run has shown what the child was
+        # actually granted. `rule` is the requirement to enforce, not an
+        # observation. Only a dynamic stage may set this true.
+        delegation = {"inherits": "inherits-toolsets", "rule": "narrow-only",
+                      "verified": False}
     else:
         delegation = {"inherits": "none"}
 
@@ -676,7 +697,6 @@ def scan_skill(repo: str, path: str, commit: str):
 
     evidence = {
         "generator": "generate_baseline.py",
-        "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         "method": METHOD,
         "commit": commit,
         "files_scanned": n_files,

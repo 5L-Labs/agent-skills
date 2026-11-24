@@ -132,6 +132,10 @@
         "rule": {
           "enum": ["narrow-only", "inherit"],
           "description": "narrow-only: delegated children get no wider grant than the parent's own shape"
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "true only when a dynamic stage observed the child's actual toolset; false at method: static"
         }
       }
     },

@@ -86,7 +86,9 @@ Schema: `references/manifest.v0.json`. Required top-level keys: `schema`, `skill
   at `method: static`.
 - `tools[].reach` — `narrow|medium|wide|inherits|unknown`; `inherits` is
   `delegate_task`.
-- `delegation.rule: narrow-only`.
+- `delegation.rule: narrow-only` — the requirement to enforce, with
+  `delegation.verified: false`: no run has observed what a child was actually
+  granted. Only a dynamic stage may set that true.
 - `provenance.inputs` — everything the confidence score is recomputed from:
   `files_scanned`, `files_skipped`, `hosts_runtime`, `hosts_setup`, `tools`,
   `review`, `dynamic`, `backtest`.
@@ -98,8 +100,11 @@ Run
 ```bash
 /usr/bin/python3 scripts/validate_corpus.py --corpus <out> --repo <audited-repo> \
   --report <out>/_reports/distribution.md
-/usr/bin/python3 scripts/test_generate_baseline.py    # generator regression tests
+/usr/bin/python3 scripts/test_generate_baseline.py    # 16 generator regression tests
 ```
+
+Evidence is byte-stable for a given commit: there is no timestamp in
+`evidence/static.json`, so two runs over the same commit produce identical files.
 
 It MUST report `result: pass`: every skill covered; YAML/JSON parse; schema
 valid; `confidence <= cap(method)`; `provenance.inputs` present; `commit` equals
