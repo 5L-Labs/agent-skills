@@ -14,6 +14,15 @@
       "last_validated": null,
       "last_result": null,
       "note": "Validate nightly rebuild survival + durable output dir on next daily (10:00) and weekly (16:00) delivery"
+    },
+    {
+      "skill": "hn-brief-dataset",
+      "root": "research/hn-brief-dataset",
+      "last_change": "2026-11-24",
+      "spec": "references/validation-spec.md",
+      "last_validated": "2026-11-24T05:45:00+00:00",
+      "last_result": "PASS — all three jobs verified by reading the channels back. DAILY 2026-11-24 07:45 ET: email (28,469 chars) + 19 Discord chunks to #hacker-news; 08:15 retry skipped both targets via per-target dedupe. WEEKLY: 16 stories, 16 distinct Link + 16 distinct Discussion URLs, 0 fabricated, no Jargon, 8,537 chars, delivered + cached. MONTHLY (after the tool-contract fix): 4 API calls / 16 min (was 60 calls / 8h16m), 27 stories, 27 distinct Link + 27 distinct Discussion URLs, 0 fabricated, no Jargon, 13,407 chars, 6 chunks delivered to #hacker-news-monthly, cached. Minor: monthly runs ~12% over its 12,000-char cap — the model does not reliably honour char caps.",
+      "note": "Daily now delivers email + Discord #hacker-news (separate state files per target); new weekly/monthly aggregator jobs use the local model. Validate: first daily run posts both targets exactly once; weekly (Sun 20:00 UTC) and monthly (1st 18:00 UTC) produce a real themed digest with citations, no Jargon section, and write their save_to cache file."
     }
   ]
 }
