@@ -76,7 +76,10 @@ def build(days: int, end: str | None, headlines: int, digest_chars: int) -> dict
             "stories": [
                 {"rank": i, "title": s["title"], "domain": domain(s["url"]),
                  "points": s["points"], "comments": s.get("num_comments", 0),
-                 "url": s["url"], "hn": hn_link(s)}
+                 "url": s["url"], "hn": hn_link(s),
+                 # articleSource (new 2026-11-26): anything but "fetched" means the
+                 # story summary was not written from the article itself.
+                 "src": s.get("articleSource") or ""}
                 for i, s in enumerate(stories, 1)
             ],
             "digest": digest[:digest_chars] + (" …" if len(digest) > digest_chars else ""),
@@ -107,6 +110,7 @@ def render(doc: dict, days: int, label: str) -> str:
         "This is the raw material: top headlines per day + a bounded excerpt of each day's digest.",
         "Every story line carries its OWN article URL and its OWN HN discussion URL.",
         "Use them verbatim, exactly as given — never invent, shorten, or reuse a URL from another story.",
+        "A story tagged (src: ...) had no readable article — describe it from the headline and the day's digest only.",
         "",
     ]
     for day in doc["days"]:
@@ -118,7 +122,9 @@ def render(doc: dict, days: int, label: str) -> str:
         for s in day["stories"]:
             out.append(f"  {s['rank']}. {s['title']} ({s['domain']}) "
                        f"{s['points']} pts, {s['comments']} cmts")
-            out.append(f"      article: {s['url']}")
+            out.append(f"      article: {s['url']}"
+                       + (f"  (src: {s['src']} — article not read)"
+                          if s.get("src") not in ("", "fetched") else ""))
             out.append(f"      hn: {s['hn']}")
         out.append("")
         out.append(f"DAILY DIGEST ({day.get('digestFullChars')} chars"

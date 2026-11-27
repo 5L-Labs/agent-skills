@@ -11,19 +11,28 @@ aggregator jobs, which summarize with the local model.
 | `#hacker-news-weekly` | `1507971737055264831` | `hn-brief-weekly-aggregate` |
 | `#hacker-news-monthly` | `1507971842374111363` | `hn-brief-monthly-aggregate` |
 
-## Daily: `hn-brief-email.py` (email + Daily Channel)
+## Daily: `hn-brief-email.py` (email + Daily Channel + Signal Daily Notices)
 
 | Piece | Value |
 |---|---|
-| Targets | `email,discord` (default; override with `--targets`, `HN_BRIEF_TARGETS`) |
-| Email | `HN Brief — <date>`; header → 20 headlines (points, comments, article URL, HN link) → `DIGEST` → full digest; multipart plain + HTML |
-| Discord | the same plain-text briefing, chunked to Discord's 2000-char cap (one message per chunk, `(i/n)` suffix) |
-| Cron | three runs, `timezone: America/New_York` — 07:45 (main), 08:15 and 09:15 (retries); `deliver: local` (the script posts Discord itself) |
+| Targets | `email,discord,signal` (default; override with `--targets`, `HN_BRIEF_TARGETS`) |
+| Per-story blocks | every story renders with its `discussion_summary` and, when the day publishes them, up to 2 verbatim `topComments` (`• author · score: text  <comment url>` — 200-char clip; `score` is a ranking score, never print it as "points"). A story whose `articleSource` is not `fetched` gets a bracketed provenance note on its article line (`[article fetch failed — summary is from the link, not the page]`, `[no article — summary is the HN post itself]`, `[PDF not parsed — summary is from the link, not the paper]`) |
+| Email | `HN Brief — <date>`; header → 20 stories (points, comments, article URL, HN link, discussion clip, top comments) → `DIGEST` → full digest; multipart plain + HTML |
+| Discord | the same full briefing, chunked to Discord's 2000-char cap (one message per chunk, `(i/n)` suffix) |
+| Signal | a **phone-sized render of the same day**, chunked at 1600 chars (`[i/n]` prefix): shorter discussion clips (300 vs 450 chars) and a 1200-char digest head plus a pointer to the full essay. Sent with `hermes send -t signal:Daily Notices` — no token of its own, the group name resolves through the gateway's Signal config |
+| Cron | three runs, `timezone: America/New_York` — 07:45 (main), 08:15 and 09:15 (retries); `deliver: local` (the script posts Discord and Signal itself) |
 | Entry point | `HERMES_HOME/scripts/hn-brief-email.py` (real-file shim) → this skill's script |
-| State | `/opt/data/state/hn-brief-email.last-sent.json`, `/opt/data/state/hn-brief-discord.last-sent.json` — one per target, so a failure on one never suppresses the other |
+| State | `/opt/data/state/hn-brief-email.last-sent.json`, `hn-brief-discord.last-sent.json`, `hn-brief-signal.last-sent.json` — one per target, so a failure on one never suppresses the others |
 | Log | `/opt/data/logs/hn-brief-email.log` |
-| Cache | `/opt/data/cache/hn-brief-email/<date>.txt` and `.html` |
+| Cache | `/opt/data/cache/hn-brief-email/<date>.txt`, `.html`, `.signal.txt` |
 | Exit | 0 on success/skip (silent); 2 on a real transport failure so `hermes cron list` shows `last_status=error` |
+
+The briefing is input-dominated by the discussion text: with `topComments` live
+the full render is ~35 KB (22 Discord messages) and the Signal render ~16 KB
+(11 messages). Signal keeps its own tighter comment budget (`--signal-comments 1`,
+140 chars) because the first day comments shipped it posted 16 messages; email and
+Discord stay at 2 comments × 200 chars. `--dry-run` prints both chunk counts
+before anything is sent.
 
 Skip rules (silent, exit 0): briefing date != today in America/New_York (the
 07:45 run exits quietly when the pipeline is late and the 08:15/09:15 runs pick
@@ -69,7 +78,7 @@ delivered to the Discord channel (the gateway chunks long responses).
 | Piece | Weekly | Monthly |
 |---|---|---|
 | Prep shim (real file in `HERMES_HOME/scripts/`) | `hn-brief-weekly-prep.py` | `hn-brief-monthly-prep.py` |
-| Corpus | last 7 published days, 20 headlines/day, 3000-char digest excerpt, each story with its own `article:` + `hn:` URL | last 30 published days, 12 headlines/day, 1500-char excerpt, same URL contract |
+| Corpus | last 7 published days, 20 headlines/day, 3000-char digest excerpt, each story with its own `article:` + `hn:` URL, and `(src: … — article not read)` on any story whose article the pipeline never read | last 30 published days, 12 headlines/day, 1500-char excerpt, same URL + provenance contract |
 | Skills | `unified-digest-themes`, `hn-brief-dataset` | same |
 | Model / provider | `qwen3.8-27b-instruct-mtp-d3-ctx131k-no-backend-sampling` / `ollama-qwen3.6:27b` (local, `http://host.containers.internal:11434/v1`) | same |
 | Toolsets | `["file"]` only (read_file/write_file — never terminal) | same |
@@ -106,15 +115,25 @@ Notes that cost time if forgotten:
   44 KB corpus (~11 K tokens) round-trips fine as a direct call.
 - Jargon is **not** emitted by these jobs. Presentation is owned by the
   `jargon-notify` job; these digests are content only.
+- Corpus provenance tags are load-bearing: a story line tagged
+  `(src: … — article not read)` means the pipeline never read that page, so the
+  aggregator must describe it from the headline and that day's digest only. Both
+  prompts restate this as a hard rule — the model follows the prompt, not this
+  document.
 
 ## Verifying without waiting
 
 ```bash
 S=/opt/data/skills/research/hn-brief-dataset/scripts
-python3 $S/hn-brief-email.py --dry-run          # render + count Discord chunks
+python3 $S/hn-brief-email.py --dry-run          # render + count Discord and Signal chunks
 python3 $S/hn-brief-email.py --targets discord  # post only the Daily Channel
+python3 $S/hn-brief-email.py --targets signal --allow-stale   # re-post / transport test
 python3 $S/hn-brief-period.py --days 7 | head   # inspect the weekly corpus
 ```
+
+`--allow-stale` bypasses the "briefing date must be today" skip, which is the only
+way to exercise the Signal path (or re-post a day) outside the 07:45–09:15 window.
+It logs a WARNING line every time it is used.
 
 Read the channel back to confirm a post really landed (bot token from `.env`):
 

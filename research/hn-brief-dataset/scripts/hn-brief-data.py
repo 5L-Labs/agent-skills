@@ -27,6 +27,15 @@ from zoneinfo import ZoneInfo
 DATA_ROOT = Path("/opt/shared_space/hn-brief-data")
 NY = ZoneInfo("America/New_York")
 
+# `articleSource` (dataset field added 2026-11-26): how the pipeline obtained the
+# article before summarizing. Anything but "fetched" means the summary leans on
+# metadata, the HN post, or an unparsed PDF — never present it as the article.
+PROVENANCE_NOTES = {
+    "fetch_failed": "article fetch failed — summary is from the link, not the page",
+    "self_post": "no article — summary is the HN post itself",
+    "pdf_skipped": "PDF not parsed — summary is from the link, not the paper",
+}
+
 
 def ny_today() -> str:
     return datetime.now(NY).strftime("%Y-%m-%d")
@@ -76,9 +85,16 @@ def staleness_note() -> str | None:
     return None
 
 
+def provenance_note(story: dict) -> str:
+    """Caveat for stories whose article was not actually read; '' when fetched."""
+    return PROVENANCE_NOTES.get(str(story.get("articleSource") or ""), "")
+
+
 def fmt_story(idx: int, s: dict) -> str:
+    note = provenance_note(s)
+    tail = f"  [{note}]" if note else ""
     return (f"{idx}. {s['title']} ({s['points']} points, {s.get('num_comments', 0)} comments)\n"
-            f"   {s['url']}\n"
+            f"   {s['url']}{tail}\n"
             f"   HN: {hn_link(s)}")
 
 
@@ -127,6 +143,7 @@ def cmd_search(args) -> None:
         for rank, s in enumerate(day["stories"], 1):
             blob = " ".join(str(s.get(k) or "") for k in
                             ("title", "url", "summary", "discussion_summary")).lower()
+            blob += " " + " ".join((c.get("text") or "") for c in (s.get("topComments") or [])).lower()
             if q in blob:
                 hits.append((date, rank, s))
     if args.json:
@@ -159,6 +176,11 @@ def cmd_day(args) -> None:
         if args.full:
             print(f"   Article: {s.get('summary')}")
             print(f"   Discussion: {s.get('discussion_summary')}")
+            for c in (s.get("topComments") or [])[: max(args.comments, 0)]:
+                score = c.get("score")
+                tag = f" · {score:g}" if isinstance(score, (int, float)) else ""
+                print(f"   • {c.get('author') or '?'}{tag}: "
+                      f"{' '.join((c.get('text') or '').split())}")
         print()
 
 
@@ -191,7 +213,10 @@ def main() -> None:
     sp.set_defaults(func=cmd_search)
 
     sp = with_json(sub.add_parser("day")); sp.add_argument("date")
-    sp.add_argument("--full", action="store_true"); sp.set_defaults(func=cmd_day)
+    sp.add_argument("--full", action="store_true")
+    sp.add_argument("--comments", type=int, default=0,
+                    help="verbatim top comments per story, with --full (0 = none)")
+    sp.set_defaults(func=cmd_day)
 
     sp = with_json(sub.add_parser("digest")); sp.add_argument("--date")
     sp.set_defaults(func=cmd_digest)
